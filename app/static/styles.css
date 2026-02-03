@@ -1,0 +1,102 @@
+body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:#f5f7fb; margin:0; padding:20px; }
+.container { max-width:900px; margin:24px auto; padding:18px; background:#fff; border-radius:10px; box-shadow:0 10px 30px rgba(2,6,23,0.08); }
+h1 { text-align:center; margin:0 0 12px; }
+.meta-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.target { font-size:20px; font-weight:600; }
+.attempts { font-size:14px; color:#374151; }
+
+.template-area {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:10px;
+  border-radius:8px;
+  background:linear-gradient(90deg,#fff,#fbfdff);
+  border:1px solid #e6eef8;
+  /* single-line layout */
+  white-space:nowrap;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  min-height:56px;
+}
+
+.inline-token {
+  display:inline-block;
+  padding:4px 6px;
+  font-weight:700;
+  color:#0f172a;
+  background:transparent; /* operators just look like part of background */
+  border-radius:4px;
+  font-size:18px;
+}
+
+.slot {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:44px;
+  height:44px;
+  border-radius:8px;
+  border:0;
+  background:linear-gradient(180deg,#f8fafc,#eef2ff);
+  box-shadow: inset 0 -2px 0 rgba(255,255,255,0.6);
+  font-weight:700;
+  color:#0f172a;
+}
+
+.bank-area { margin:16px 0 8px; text-align:center; }
+.bank { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; padding:10px; border-radius:8px; background:#f8fafc; min-height:56px; }
+/* .bank-item {
+  transition: transform 120ms ease, box-shadow 120ms ease;
+} */
+
+body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
+  transform: scale(1.03);
+}
+
+
+.controls { display:flex; gap:8px; justify-content:center; margin-top:8px; }
+.controls button { padding:10px 14px; border-radius:8px; border:none; background:#111827; color:white; cursor:pointer; font-weight:700; }
+
+.result { margin-top:12px; text-align:center; font-weight:600; }
+.result.success { color:#065f46; }
+.result.error { color:#7f1d1d; }
+.result.reveal { color:#0b5; }
+
+/* style for the clone that will be created by JS */
+.snap-clone {
+  transform-origin: center;
+  will-change: transform, opacity;
+  /* visual fallbacks in case JS doesn't copy computed styles */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: #2563eb;
+  color: white;
+  font-weight: 700;
+  box-sizing: border-box;
+}
+
+.bank-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 44px;
+  height: 44px;
+  padding: 0 12px;
+
+  background: #2563eb;
+  color: white;
+  font-weight: 700;
+  font-size: 18px;
+
+  border-radius: 10px;
+  cursor: grab;
+  user-select: none;
+
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.25);
+  transition: box-shadow 120ms ease;
+}
