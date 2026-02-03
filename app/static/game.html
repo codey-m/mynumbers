@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Numbers Puzzle — Drag & Drop</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Numbers Puzzle</h1>
+
+    <div class="meta-row">
+      <div class="target">Target: <span id="target">—</span></div>
+      <div class="attempts">Attempts: <span id="attempts">0</span>/3</div>
+    </div>
+
+    <div class="template-area" id="template-area" aria-live="polite"></div>
+
+    <div class="bank-area">
+      <h3>Numbers</h3>
+      <div id="bank" class="bank"></div>
+    </div>
+
+    <div class="controls">
+      <button id="resetBtn">Reset</button>
+      <button id="checkBtn">Check</button>
+      <button id="newBtn">New Puzzle</button>
+    </div>
+
+    <div id="result" class="result" role="status"></div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
