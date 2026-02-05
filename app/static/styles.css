@@ -100,3 +100,7 @@ body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
   box-shadow: 0 6px 14px rgba(37, 99, 235, 0.25);
   transition: box-shadow 120ms ease;
 }
+
+.bank-item, .slot, #bank, #template-area {
+  touch-action: none;
+}
