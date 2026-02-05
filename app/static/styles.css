@@ -108,3 +108,86 @@ body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
   user-select: none;
   -webkit-touch-callout: none;
 }
+
+/* Mobile responsive adjustments */
+@media (max-width: 600px) {
+  body {
+    padding: 8px;
+  }
+
+  .container {
+    margin: 8px auto;
+    padding: 12px;
+  }
+
+  h1 {
+    font-size: 20px;
+    margin-bottom: 8px;
+  }
+
+  .meta-row {
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+
+  .target {
+    font-size: 16px;
+  }
+
+  .attempts {
+    font-size: 12px;
+  }
+
+  .template-area {
+    padding: 8px;
+    gap: 4px;
+    min-height: 48px;
+  }
+
+  .inline-token {
+    font-size: 16px;
+    padding: 2px 4px;
+  }
+
+  .slot {
+    min-width: 40px;
+    height: 40px;
+  }
+
+  .bank-area {
+    margin: 12px 0 8px;
+  }
+
+  .bank-area h3 {
+    font-size: 16px;
+    margin: 0 0 8px;
+  }
+
+  .bank {
+    padding: 8px;
+    gap: 6px;
+    min-height: 48px;
+  }
+
+  .bank-item {
+    min-width: 40px;
+    height: 40px;
+    font-size: 16px;
+    padding: 0 10px;
+  }
+
+  .controls {
+    margin-top: 8px;
+    gap: 6px;
+  }
+
+  .controls button {
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+
+  .result {
+    margin-top: 10px;
+    font-size: 14px;
+  }
+}
