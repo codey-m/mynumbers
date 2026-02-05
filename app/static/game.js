@@ -1,24 +1,23 @@
-// static/game.js
-// Drag/drop + mobile-friendly touch dragging (prevents scroll + ghost clicks)
+console.log("game.js v8 loaded");
 
 let puzzle = null;
 let attempts = 0;
 
 const SNAP_THRESHOLD = 120;
 const SNAP_ANIM_MS = 180;
-
-// Tap / ghost click tuning
-const TAP_MOVE_PX = 18;          // bigger = more forgiving taps
-const CLICK_SUPPRESS_MS = 1200;  // suppress mobile "ghost clicks" after touch
+const TAP_MOVE_PX = 18;
+const CLICK_SUPPRESS_MS = 1200;
 
 let suppressClickUntil = 0;
-
-// Touch/pen pointer drag state
 let pointerState = null;
-
-// Scroll lock state (prevents page moving while dragging)
 let scrollLockY = 0;
 let scrollLocked = false;
+
+// iOS scroll blocker: prevent page scrolling while dragging
+function touchMoveBlocker(e) {
+  if (pointerState) e.preventDefault();
+}
+window.addEventListener("touchmove", touchMoveBlocker, { passive: false });
 
 function suppressGhostClicks() {
   suppressClickUntil = Date.now() + CLICK_SUPPRESS_MS;
@@ -29,8 +28,6 @@ function lockPageScroll() {
   scrollLocked = true;
   scrollLockY = window.scrollY;
 
-  // Prevent document scrolling while we drag.
-  // This pattern works well on iOS Safari too.
   document.body.style.position = "fixed";
   document.body.style.top = `-${scrollLockY}px`;
   document.body.style.left = "0";
@@ -52,7 +49,7 @@ function unlockPageScroll() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Global ghost-click canceller (capture phase)
+  // Global ghost-click canceller
   document.addEventListener(
     "click",
     (ev) => {
@@ -68,7 +65,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("checkBtn").addEventListener("click", checkPuzzle);
   document.getElementById("newBtn").addEventListener("click", newPuzzle);
 
-  // Desktop HTML5 drag/drop targets
   const template = document.getElementById("template-area");
   template.ondragover = (ev) => ev.preventDefault();
   template.ondrop = handleDropOnTemplate;
@@ -83,16 +79,19 @@ document.addEventListener("DOMContentLoaded", () => {
     updateControls();
   };
 
-  // Click-to-place (mostly desktop). Ghost clicks are suppressed globally above.
-  bank.addEventListener("click", (ev) => {
-    const item = ev.target.closest(".bank-item");
-    if (!item) return;
-    if (pointerState) return; // ignore if mid touch-drag
+  // Only enable click-to-place on desktop (not touch devices)
+  const IS_TOUCH = navigator.maxTouchPoints && navigator.maxTouchPoints > 0;
+  if (!IS_TOUCH) {
+    bank.addEventListener("click", (ev) => {
+      const item = ev.target.closest(".bank-item");
+      if (!item) return;
+      if (pointerState) return;
 
-    const next = findNextEmptySlot();
-    if (!next) return;
-    animateSnapAndPlace(item, next);
-  });
+      const next = findNextEmptySlot();
+      if (!next) return;
+      animateSnapAndPlace(item, next);
+    });
+  }
 
   newPuzzle();
 });
@@ -132,11 +131,9 @@ function renderTemplate(tokens) {
       slot.className = "slot";
       slot.dataset.slotIndex = idx;
 
-      // Desktop DnD
       slot.addEventListener("dragover", (ev) => ev.preventDefault());
       slot.addEventListener("drop", handleDropOnSlot);
 
-      // Tap/click to remove from slot back to bank
       slot.addEventListener("click", (ev) => {
         const child = slot.querySelector(".bank-item");
         if (child && ev.target.closest(".bank-item")) {
@@ -169,7 +166,6 @@ function renderBank(numbers) {
     item.dataset.value = n;
     item.textContent = n;
 
-    // Desktop: enable dragging only on mouse down so clicks work
     item.addEventListener("mousedown", () => {
       item.draggable = true;
     });
@@ -198,9 +194,8 @@ function renderBank(numbers) {
       }, 0);
     });
 
-    // Touch/pen pointer drag
     item.addEventListener("pointerdown", (ev) => {
-      if (ev.pointerType === "mouse") return; // mouse uses HTML5 DnD
+      if (ev.pointerType === "mouse") return;
       pointerDownHandler(ev);
     });
 
@@ -496,10 +491,6 @@ function updateControls() {
   checkBtn.disabled = !puzzle || !canCheck();
 }
 
-/* ---------------------------
-   Touch / pointer drag logic
----------------------------- */
-
 function pointerDownHandler(ev) {
   if (ev.pointerType === "mouse") return;
   if (ev.button && ev.button !== 0) return;
@@ -510,7 +501,6 @@ function pointerDownHandler(ev) {
 
   const el = ev.currentTarget;
 
-  // cancel any existing drag
   if (pointerState) endPointerDrag({ revealOriginal: true, removeClone: true });
 
   try { el.setPointerCapture && el.setPointerCapture(ev.pointerId); } catch (_) {}
@@ -563,7 +553,6 @@ function pointerMoveHandler(ev) {
   clone.style.left = `${ev.clientX - offsetX}px`;
   clone.style.top = `${ev.clientY - offsetY}px`;
 
-  // Highlight nearest empty slot
   const allSlots = Array.from(document.querySelectorAll(".slot"));
   const emptySlots = allSlots.filter((s) => !s.querySelector(".bank-item"));
 
@@ -602,10 +591,9 @@ function pointerUpHandler(ev) {
 
   const dist = Math.hypot(lastX - startX, lastY - startY);
   const dt = performance.now() - startT;
-  const isTap = dist <= TAP_MOVE_PX && dt < 600; // forgiving tap
+  const isTap = dist <= TAP_MOVE_PX && dt < 600;
 
   if (isTap) {
-    // End drag visuals immediately, then tap-to-place
     endPointerDrag({ revealOriginal: true, removeClone: true });
 
     const next = findNextEmptySlot();
@@ -617,7 +605,6 @@ function pointerUpHandler(ev) {
     return;
   }
 
-  // Drag-drop: choose target slot
   const x = ev.clientX;
   const y = ev.clientY;
 
@@ -664,7 +651,6 @@ function pointerUpHandler(ev) {
   const existing = target.querySelector(".bank-item");
   if (existing) bank.appendChild(existing);
 
-  // Animate the drag clone into the slot, then place the original
   animatePointerCloneIntoSlot({ dragClone: clone, originEl, slot: target });
 }
 
@@ -700,7 +686,6 @@ function endPointerDrag({ revealOriginal, removeClone }) {
 }
 
 function animatePointerCloneIntoSlot({ dragClone, originEl, slot }) {
-  // End pointer tracking but keep the clone for the animation
   endPointerDrag({ revealOriginal: false, removeClone: false });
 
   const rectFrom = dragClone.getBoundingClientRect();
