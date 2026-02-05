@@ -1,5 +1,5 @@
 // static/game.js
-// Numbers Puzzle — drag/drop + touch-friendly pointer dragging (no ghost-click shuffle)
+// Drag/drop + mobile-friendly touch dragging (prevents scroll + ghost clicks)
 
 let puzzle = null;
 let attempts = 0;
@@ -7,20 +7,68 @@ let attempts = 0;
 const SNAP_THRESHOLD = 120;
 const SNAP_ANIM_MS = 180;
 
-// Touch/tap tuning
-const TAP_MOVE_PX = 10;         // how far finger can move and still count as a tap
-const CLICK_SUPPRESS_MS = 800;  // suppress ghost click after touch for this long
+// Tap / ghost click tuning
+const TAP_MOVE_PX = 18;          // bigger = more forgiving taps
+const CLICK_SUPPRESS_MS = 1200;  // suppress mobile "ghost clicks" after touch
 
 let suppressClickUntil = 0;
 
-// Pointer drag state (for touch/pen)
+// Touch/pen pointer drag state
 let pointerState = null;
 
+// Scroll lock state (prevents page moving while dragging)
+let scrollLockY = 0;
+let scrollLocked = false;
+
+function suppressGhostClicks() {
+  suppressClickUntil = Date.now() + CLICK_SUPPRESS_MS;
+}
+
+function lockPageScroll() {
+  if (scrollLocked) return;
+  scrollLocked = true;
+  scrollLockY = window.scrollY;
+
+  // Prevent document scrolling while we drag.
+  // This pattern works well on iOS Safari too.
+  document.body.style.position = "fixed";
+  document.body.style.top = `-${scrollLockY}px`;
+  document.body.style.left = "0";
+  document.body.style.right = "0";
+  document.body.style.width = "100%";
+}
+
+function unlockPageScroll() {
+  if (!scrollLocked) return;
+  scrollLocked = false;
+
+  document.body.style.position = "";
+  document.body.style.top = "";
+  document.body.style.left = "";
+  document.body.style.right = "";
+  document.body.style.width = "";
+
+  window.scrollTo(0, scrollLockY);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+  // Global ghost-click canceller (capture phase)
+  document.addEventListener(
+    "click",
+    (ev) => {
+      if (Date.now() < suppressClickUntil) {
+        ev.preventDefault();
+        ev.stopPropagation();
+      }
+    },
+    true
+  );
+
   document.getElementById("resetBtn").addEventListener("click", resetSlots);
   document.getElementById("checkBtn").addEventListener("click", checkPuzzle);
   document.getElementById("newBtn").addEventListener("click", newPuzzle);
 
+  // Desktop HTML5 drag/drop targets
   const template = document.getElementById("template-area");
   template.ondragover = (ev) => ev.preventDefault();
   template.ondrop = handleDropOnTemplate;
@@ -35,13 +83,11 @@ document.addEventListener("DOMContentLoaded", () => {
     updateControls();
   };
 
-  // Click-to-place from bank (mouse + desktop). On mobile we suppress ghost clicks.
+  // Click-to-place (mostly desktop). Ghost clicks are suppressed globally above.
   bank.addEventListener("click", (ev) => {
-    if (Date.now() < suppressClickUntil) return;
-
     const item = ev.target.closest(".bank-item");
     if (!item) return;
-    if (pointerState) return; // if currently pointer-dragging, ignore
+    if (pointerState) return; // ignore if mid touch-drag
 
     const next = findNextEmptySlot();
     if (!next) return;
@@ -50,10 +96,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   newPuzzle();
 });
-
-function suppressGhostClick() {
-  suppressClickUntil = Date.now() + CLICK_SUPPRESS_MS;
-}
 
 function newPuzzle() {
   attempts = 0;
@@ -90,15 +132,12 @@ function renderTemplate(tokens) {
       slot.className = "slot";
       slot.dataset.slotIndex = idx;
 
-      // Desktop HTML5 DnD
+      // Desktop DnD
       slot.addEventListener("dragover", (ev) => ev.preventDefault());
       slot.addEventListener("drop", handleDropOnSlot);
 
-      // Click-to-remove from slot back to bank
-      // (works on mobile too; no drag required)
+      // Tap/click to remove from slot back to bank
       slot.addEventListener("click", (ev) => {
-        if (Date.now() < suppressClickUntil) return;
-
         const child = slot.querySelector(".bank-item");
         if (child && ev.target.closest(".bank-item")) {
           document.getElementById("bank").appendChild(child);
@@ -125,12 +164,12 @@ function renderBank(numbers) {
   numbers.forEach((n, i) => {
     const item = document.createElement("div");
     item.className = "bank-item";
-    item.draggable = false; // desktop: enable only after mousedown
+    item.draggable = false;
     item.id = `bank-item-${i}-${n}-${Math.random().toString(36).slice(2, 8)}`;
     item.dataset.value = n;
     item.textContent = n;
 
-    // Desktop drag support
+    // Desktop: enable dragging only on mouse down so clicks work
     item.addEventListener("mousedown", () => {
       item.draggable = true;
     });
@@ -147,7 +186,6 @@ function renderBank(numbers) {
     item.addEventListener("dragend", () => {
       document.body.classList.remove("dragging");
 
-      // Defer so drop handlers run first
       setTimeout(() => {
         const el = document.getElementById(item.id);
         if (!el) return;
@@ -218,7 +256,6 @@ function handleDropOnTemplate(ev) {
   const dropX = ev.clientX;
   const dropY = ev.clientY;
 
-  // If dropped directly inside a slot, use that slot
   let containing = null;
   for (const s of allSlots) {
     const r = s.getBoundingClientRect();
@@ -235,7 +272,6 @@ function handleDropOnTemplate(ev) {
     return;
   }
 
-  // Otherwise snap to nearest empty slot within threshold
   const emptySlots = allSlots.filter((s) => !s.querySelector(".bank-item"));
   if (emptySlots.length === 0) {
     bank.appendChild(dragged);
@@ -263,6 +299,29 @@ function handleDropOnTemplate(ev) {
   }
 }
 
+function makeVisualClone(el, className) {
+  const clone = el.cloneNode(true);
+  clone.className = "";
+  clone.classList.add(className);
+
+  const cs = getComputedStyle(el);
+  clone.style.background = cs.backgroundColor || cs.background;
+  clone.style.color = cs.color;
+  clone.style.padding = cs.padding;
+  clone.style.borderRadius = cs.borderRadius;
+  clone.style.fontWeight = cs.fontWeight;
+  clone.style.fontSize = cs.fontSize;
+  clone.style.display = "inline-flex";
+  clone.style.alignItems = "center";
+  clone.style.justifyContent = "center";
+  clone.style.boxSizing = "border-box";
+  clone.style.boxShadow = cs.boxShadow;
+  clone.style.userSelect = "none";
+  clone.style.webkitUserSelect = "none";
+
+  return clone;
+}
+
 function animateSnapAndPlace(el, slot) {
   document.body.classList.remove("dragging");
   if (el.parentElement === slot) return;
@@ -288,7 +347,6 @@ function animateSnapAndPlace(el, slot) {
 
   document.body.appendChild(clone);
 
-  // hide original during animation
   el.style.visibility = "hidden";
 
   const dx = rectTo.left + rectTo.width / 2 - (rectFrom.left + rectFrom.width / 2);
@@ -320,29 +378,6 @@ function animateSnapAndPlace(el, slot) {
 
   clone.addEventListener("transitionend", cleanup);
   setTimeout(cleanup, SNAP_ANIM_MS + 220);
-}
-
-function makeVisualClone(el, className) {
-  const clone = el.cloneNode(true);
-  clone.className = "";
-  clone.classList.add(className);
-
-  // copy computed styles so it looks identical
-  const cs = getComputedStyle(el);
-  clone.style.background = cs.backgroundColor || cs.background;
-  clone.style.color = cs.color;
-  clone.style.padding = cs.padding;
-  clone.style.borderRadius = cs.borderRadius;
-  clone.style.fontWeight = cs.fontWeight;
-  clone.style.fontSize = cs.fontSize;
-  clone.style.display = "inline-flex";
-  clone.style.alignItems = "center";
-  clone.style.justifyContent = "center";
-  clone.style.boxSizing = "border-box";
-  clone.style.boxShadow = cs.boxShadow;
-  clone.style.userSelect = "none";
-
-  return clone;
 }
 
 function resetSlots() {
@@ -458,11 +493,7 @@ function canCheck() {
 
 function updateControls() {
   const checkBtn = document.getElementById("checkBtn");
-  if (!puzzle) {
-    checkBtn.disabled = true;
-    return;
-  }
-  checkBtn.disabled = !canCheck();
+  checkBtn.disabled = !puzzle || !canCheck();
 }
 
 /* ---------------------------
@@ -470,18 +501,18 @@ function updateControls() {
 ---------------------------- */
 
 function pointerDownHandler(ev) {
-  // Only for touch/pen; mouse is handled by HTML5 drag events
   if (ev.pointerType === "mouse") return;
   if (ev.button && ev.button !== 0) return;
 
-  suppressGhostClick();
+  ev.preventDefault();
+  suppressGhostClicks();
+  lockPageScroll();
 
   const el = ev.currentTarget;
 
-  // Cancel any existing pointer drag
+  // cancel any existing drag
   if (pointerState) endPointerDrag({ revealOriginal: true, removeClone: true });
 
-  // Capture the pointer so we keep getting move/up events
   try { el.setPointerCapture && el.setPointerCapture(ev.pointerId); } catch (_) {}
 
   const rect = el.getBoundingClientRect();
@@ -498,7 +529,6 @@ function pointerDownHandler(ev) {
 
   document.body.appendChild(clone);
 
-  // Hide original while dragging
   el.style.visibility = "hidden";
   document.body.classList.add("dragging");
 
@@ -510,7 +540,9 @@ function pointerDownHandler(ev) {
     offsetY: ev.clientY - rect.top,
     startX: ev.clientX,
     startY: ev.clientY,
-    moved: false,
+    lastX: ev.clientX,
+    lastY: ev.clientY,
+    startT: performance.now(),
   };
 
   window.addEventListener("pointermove", pointerMoveHandler, { passive: false });
@@ -524,22 +556,18 @@ function pointerMoveHandler(ev) {
 
   ev.preventDefault();
 
+  pointerState.lastX = ev.clientX;
+  pointerState.lastY = ev.clientY;
+
   const { clone, offsetX, offsetY } = pointerState;
   clone.style.left = `${ev.clientX - offsetX}px`;
   clone.style.top = `${ev.clientY - offsetY}px`;
 
-  const dx0 = ev.clientX - pointerState.startX;
-  const dy0 = ev.clientY - pointerState.startY;
-  if (!pointerState.moved && Math.hypot(dx0, dy0) > TAP_MOVE_PX) {
-    pointerState.moved = true;
-  }
-
-  // Highlight nearest empty slot while dragging
+  // Highlight nearest empty slot
   const allSlots = Array.from(document.querySelectorAll(".slot"));
   const emptySlots = allSlots.filter((s) => !s.querySelector(".bank-item"));
 
   document.querySelectorAll(".slot").forEach((s) => s.classList.remove("slot-highlight"));
-
   if (emptySlots.length === 0) return;
 
   let best = null;
@@ -566,30 +594,35 @@ function pointerUpHandler(ev) {
   if (ev.pointerId !== pointerState.pointerId) return;
 
   ev.preventDefault();
-  suppressGhostClick();
+  suppressGhostClicks();
 
-  const { originEl, clone, moved } = pointerState;
+  const { originEl, clone, startX, startY, lastX, lastY, startT } = pointerState;
 
-  // Remove slot highlight
   document.querySelectorAll(".slot").forEach((s) => s.classList.remove("slot-highlight"));
 
-  // Tap behavior: place into next empty slot
-  if (!moved) {
+  const dist = Math.hypot(lastX - startX, lastY - startY);
+  const dt = performance.now() - startT;
+  const isTap = dist <= TAP_MOVE_PX && dt < 600; // forgiving tap
+
+  if (isTap) {
+    // End drag visuals immediately, then tap-to-place
     endPointerDrag({ revealOriginal: true, removeClone: true });
 
     const next = findNextEmptySlot();
     if (next) animateSnapAndPlace(originEl, next);
     else document.getElementById("bank").appendChild(originEl);
 
+    unlockPageScroll();
     updateControls();
     return;
   }
 
-  // Drag drop: decide target slot based on finger position
+  // Drag-drop: choose target slot
   const x = ev.clientX;
   const y = ev.clientY;
 
   const allSlots = Array.from(document.querySelectorAll(".slot"));
+
   let containing = null;
   for (const s of allSlots) {
     const r = s.getBoundingClientRect();
@@ -600,6 +633,7 @@ function pointerUpHandler(ev) {
   }
 
   let target = containing;
+
   if (!target) {
     const emptySlots = allSlots.filter((s) => !s.querySelector(".bank-item"));
     let best = null;
@@ -619,32 +653,28 @@ function pointerUpHandler(ev) {
   }
 
   if (!target) {
-    // Not close to any slot: return to bank
     endPointerDrag({ revealOriginal: true, removeClone: true });
     document.getElementById("bank").appendChild(originEl);
+    unlockPageScroll();
     updateControls();
     return;
   }
 
-  // If slot already has an item, send it back to bank first
   const bank = document.getElementById("bank");
   const existing = target.querySelector(".bank-item");
   if (existing) bank.appendChild(existing);
 
-  // Animate the *drag clone* into the slot, then place the original
-  animatePointerCloneIntoSlot({
-    dragClone: clone,
-    originEl,
-    slot: target,
-  });
+  // Animate the drag clone into the slot, then place the original
+  animatePointerCloneIntoSlot({ dragClone: clone, originEl, slot: target });
 }
 
 function pointerCancelHandler(ev) {
   if (!pointerState) return;
   if (ev.pointerId !== pointerState.pointerId) return;
 
-  suppressGhostClick();
+  suppressGhostClicks();
   endPointerDrag({ revealOriginal: true, removeClone: true });
+  unlockPageScroll();
   updateControls();
 }
 
@@ -670,10 +700,7 @@ function endPointerDrag({ revealOriginal, removeClone }) {
 }
 
 function animatePointerCloneIntoSlot({ dragClone, originEl, slot }) {
-  // We are currently in pointerState mode; originEl is hidden.
-  // Keep it hidden until we place it into the slot.
-
-  // Stop pointer drag bookkeeping but DO NOT remove the dragClone yet
+  // End pointer tracking but keep the clone for the animation
   endPointerDrag({ revealOriginal: false, removeClone: false });
 
   const rectFrom = dragClone.getBoundingClientRect();
@@ -691,13 +718,14 @@ function animatePointerCloneIntoSlot({ dragClone, originEl, slot }) {
     dragClone.removeEventListener("transitionend", cleanup);
     try { dragClone.remove(); } catch (_) {}
 
-    // Place the real element and reveal it
     slot.appendChild(originEl);
     originEl.style.visibility = "";
     originEl.classList.add("placed");
     setTimeout(() => originEl.classList.remove("placed"), SNAP_ANIM_MS + 40);
 
     originEl.draggable = false;
+
+    unlockPageScroll();
     updateControls();
   };
 

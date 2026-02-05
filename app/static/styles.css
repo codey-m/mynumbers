@@ -101,6 +101,10 @@ body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
   transition: box-shadow 120ms ease;
 }
 
-.bank-item, .slot, #bank, #template-area {
+/* Make touch dragging behave: stop browser panning/zoom gestures on interactive pieces */
+.bank-item, .slot, #bank, #template-area, .container {
   touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
