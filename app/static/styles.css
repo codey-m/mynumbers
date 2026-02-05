@@ -183,26 +183,26 @@ body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
 /* Mobile responsive adjustments */
 @media (max-width: 600px) {
   body {
-    padding: 8px;
+    padding: 6px;
   }
 
   .container {
-    margin: 8px auto;
-    padding: 12px;
+    margin: 6px auto;
+    padding: 10px;
   }
 
   h1 {
-    font-size: 20px;
-    margin-bottom: 8px;
+    font-size: 18px;
+    margin-bottom: 6px;
   }
 
   .meta-row {
-    font-size: 14px;
+    font-size: 13px;
     margin-bottom: 8px;
   }
 
   .target {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .attempts {
@@ -210,49 +210,49 @@ body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
   }
 
   .template-area {
-    padding: 8px;
-    gap: 6px;
-    min-height: 48px;
+    padding: 6px;
+    gap: 4px;
+    min-height: 44px;
   }
 
   .inline-token {
-    font-size: 20px;
-    padding: 4px 6px;
+    font-size: 18px;
+    padding: 3px 4px;
     font-weight: 800;
   }
 
   .slot {
-    min-width: 36px;
-    height: 36px;
-    font-size: 15px;
+    min-width: 32px;
+    height: 32px;
+    font-size: 14px;
   }
 
   .slot .bank-item {
-    min-width: 36px;
-    height: 36px;
-    font-size: 15px;
-    padding: 0 8px;
+    min-width: 32px;
+    height: 32px;
+    font-size: 14px;
+    padding: 0 6px;
   }
 
   .bank-area {
-    margin: 12px 0 8px;
+    margin: 10px 0 6px;
   }
 
   .bank-area h3 {
-    font-size: 16px;
-    margin: 0 0 8px;
+    font-size: 15px;
+    margin: 0 0 6px;
   }
 
   .bank {
-    padding: 8px;
+    padding: 6px;
     gap: 6px;
-    min-height: 48px;
+    min-height: 44px;
   }
 
   .bank-item {
-    min-width: 40px;
-    height: 40px;
-    font-size: 16px;
+    min-width: 38px;
+    height: 38px;
+    font-size: 15px;
     padding: 0 10px;
   }
 
@@ -262,12 +262,12 @@ body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
   }
 
   .controls button {
-    padding: 8px 12px;
-    font-size: 14px;
+    padding: 8px 10px;
+    font-size: 13px;
   }
 
   .result {
-    margin-top: 10px;
-    font-size: 14px;
+    margin-top: 8px;
+    font-size: 13px;
   }
 }
