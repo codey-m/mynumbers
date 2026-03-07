@@ -8,10 +8,9 @@ A math puzzle game where you arrange numbers into equation templates to hit targ
 
 ## Features
 
-- **Practice Mode**: Solve puzzles at your own pace with 3 attempts per puzzle
+- **Practice Mode**: Solve puzzles at your own pace 
 - **Rush Mode**: Race against the clock (3-min or 5-min challenges)
 - **Progressive Difficulty**: Puzzles automatically increase in complexity as you advance
-- **Drag & Drop Interface**: Intuitive number placement with smooth animations
 
 ## How to Play
 
