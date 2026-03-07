@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Numbers Puzzle</title>
+  <link rel="stylesheet" href="styles.css?v=10" />
+</head>
+<body>
+  <div class="container">
+    <h1>Numbers Puzzle</h1>
+
+    <!-- Mode Selection (shown at start) -->
+    <div class="mode-selector" id="mode-selector">
+      <button id="practiceBtn" class="mode-btn">Practice</button>
+      <button id="rush3Btn" class="mode-btn">3-Min Rush</button>
+      <button id="rush5Btn" class="mode-btn">5-Min Rush</button>
+    </div>
+
+    <!-- Rush Stats (hidden by default) -->
+    <div class="rush-stats" id="rush-stats" style="display: none;">
+      <div class="stat">
+        <span class="stat-label">Target</span>
+        <span id="rush-target" class="stat-value">—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Time</span>
+        <span id="timer" class="stat-value">3:00</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Level</span>
+        <span id="difficulty-level" class="stat-value">1</span>
+      </div>
+    </div>
+
+    <!-- Practice Stats (shown by default) -->
+    <div class="meta-row" id="practice-stats">
+      <div class="target">Target: <span id="target">—</span></div>
+      <div class="attempts">Attempts: <span id="attempts">0</span>/3</div>
+    </div>
+
+    <div class="template-area" id="template-area" aria-live="polite"></div>
+
+    <div class="bank-area" id="bankArea">
+      <h3>Numbers</h3>
+      <div id="bank" class="bank"></div>
+    </div>
+
+    <div class="controls">
+      <button id="resetBtn">Reset</button>
+      <button id="newBtn">New Puzzle</button>
+      <button id="endRushBtn" style="display: none;" class="danger-btn">End Rush</button>
+      <button id="menuBtn" class="danger-btn">Menu</button>
+    </div>
+
+    <div id="result" class="result" role="status"></div>
+
+    <!-- Game Over Modal -->
+    <div id="modal" class="modal-overlay" style="display: none;">
+      <div class="modal-box">
+        <h2>🎉 Rush Complete!</h2>
+        <div class="modal-stats">
+          <div class="modal-stat">
+            <div class="modal-stat-value" id="puzzlesSolved">0</div>
+            <div class="modal-stat-label">Puzzles Solved</div>
+          </div>
+        </div>
+        <div class="modal-buttons">
+          <button id="playAgainBtn" class="modal-btn primary">Play Again</button>
+          <button id="backToMenuBtn" class="modal-btn">Back to Menu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js?v=10"></script>
+</body>
+</html>
