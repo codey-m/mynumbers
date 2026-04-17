@@ -1,10 +1,10 @@
-# 18.puzzle
+# ARITHMIX
 
 A math puzzle game where you arrange numbers into equation templates to hit target values.
 
 ## Play Now
 
-🎮 **[Play 18.puzzle](https://mynumbers.onrender.com/static/game.html)**
+🎮 **[Play ARITHMIX](https://mynumbers.onrender.com/static/game.html)**
 
 ## Features
 
