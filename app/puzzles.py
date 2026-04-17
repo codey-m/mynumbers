@@ -38,49 +38,55 @@ DIFFICULTY_CONFIGS = {
         "ops": ["+"],
         "min_leaf": 1,
         "max_leaf": 10,
-        "target_min": 10,
-        "target_max": 40,
-        "require_parens": 0.0,
+        "target_min": 15,
+        "target_max": 30,
+        "min_parens": 0,
+        "max_parens": 0,
     },
     2: {
         "ops": ["+", "-"],
         "min_leaf": 1,
         "max_leaf": 15,
-        "target_min": 10,
-        "target_max": 50,
-        "require_parens": 0.1,
+        "target_min": 20,
+        "target_max": 40,
+        "min_parens": 0,
+        "max_parens": 0,
     },
     3: {
         "ops": ["+", "-"],
         "min_leaf": 1,
         "max_leaf": 20,
-        "target_min": 15,
-        "target_max": 70,
-        "require_parens": 0.3,
+        "target_min": 30,
+        "target_max": 55,
+        "min_parens": 0,
+        "max_parens": 1,
     },
     4: {
         "ops": ["+", "-", "*"],
         "min_leaf": 2,
         "max_leaf": 12,
-        "target_min": 20,
-        "target_max": 90,
-        "require_parens": 0.4,
+        "target_min": 45,
+        "target_max": 70,
+        "min_parens": 1,
+        "max_parens": 2,
     },
     5: {
         "ops": ["+", "-", "*"],
         "min_leaf": 2,
         "max_leaf": 15,
-        "target_min": 25,
-        "target_max": 110,
-        "require_parens": 0.6,
+        "target_min": 60,
+        "target_max": 90,
+        "min_parens": 1,
+        "max_parens": 3,
     },
     6: {
         "ops": ["+", "-", "*", "/"],
         "min_leaf": 3,
         "max_leaf": 18,
-        "target_min": 30,
-        "target_max": 140,
-        "require_parens": 0.7,
+        "target_min": 80,
+        "target_max": 120,
+        "min_parens": 2,
+        "max_parens": 4,
     },
 }
 
@@ -524,10 +530,10 @@ def puzzle_rush(difficulty: int = 1, decoys: int = 2):
         if placeholder_count != 5:
             continue
 
-        # 8. Check parentheses requirement for this difficulty (cheap check)
-        if random.random() < config["require_parens"]:
-            if "(" not in tokens:
-                continue
+        # 8. Enforce parentheses bounds for this difficulty (cheap check)
+        paren_count = tokens.count("(")
+        if not (config["min_parens"] <= paren_count <= config["max_parens"]):
+            continue
 
         # 9. Verify: Can this template be solved with these numbers? (expensive check last)
         if not verify_template_solvable(tokens, numbers, val):

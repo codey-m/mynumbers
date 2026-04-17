@@ -1,11 +1,10 @@
-console.log("game.js v10 loaded - Rush Mode Edition");
+console.log("game.js v28 loaded - Rush Mode Edition");
 
 // ============================================================================
 // STATE MANAGEMENT
 // ============================================================================
 
 let puzzle = null;
-let attempts = 0;
 
 // Rush mode state
 let gameMode = "practice";
@@ -14,6 +13,31 @@ let timeRemaining = 0;
 let puzzlesSolved = 0;
 let currentDifficulty = 1;
 let maxDifficultyReached = 1;
+let rushIntroPlaying = false;
+let rushStarted = false;
+
+// Lightboard
+let lightboardZoneIndex = 0;
+let lightboardShuffledZones = [];
+
+// 5 rows × 3 columns of pre-defined positions (left%, top%)
+// Shuffled at the start of each rush so the fill pattern is different every game
+const LIGHTBOARD_ZONES = [
+  [2, 5],  [36, 5],  [68, 5],
+  [2, 24], [36, 24], [68, 24],
+  [2, 43], [36, 43], [68, 43],
+  [2, 62], [36, 62], [68, 62],
+  [2, 80], [36, 80], [68, 80],
+];
+
+const LIGHTBOARD_COLORS = [
+  { color: "#ff6ec7", glow: "rgba(255,110,199,0.5)" }, // neon pink
+  { color: "#39ff14", glow: "rgba(57,255,20,0.5)"   }, // neon green
+  { color: "#ffe033", glow: "rgba(255,224,51,0.5)"  }, // neon yellow
+  { color: "#00d4ff", glow: "rgba(0,212,255,0.5)"   }, // neon cyan
+  { color: "#ff9d00", glow: "rgba(255,157,0,0.5)"   }, // neon orange
+  { color: "#c77dff", glow: "rgba(199,125,255,0.5)" }, // neon purple
+];
 
 // Drag/drop constants
 const SNAP_THRESHOLD = 120;
@@ -30,8 +54,8 @@ let scrollLocked = false;
 // ============================================================================
 
 function calculateDifficulty(solved) {
-  // Progressive difficulty: every 2 puzzles increases level
-  return Math.min(6, Math.floor(solved / 2) + 1);
+  // Progressive difficulty: every 3 puzzles increases level
+  return Math.min(6, Math.floor(solved / 3) + 1);
 }
 
 // function getPoints(difficulty) {
@@ -61,6 +85,9 @@ function showMenu() {
   document.getElementById("mode-selector").style.display = "flex";
   document.getElementById("rush-stats").style.display = "none";
   document.getElementById("practice-stats").style.display = "none";
+  document.getElementById("how-to-play").style.display = "none";
+  document.getElementById("rush-ready-modal").style.display = "none";
+  document.getElementById("lightboard-section").style.display = "none";
 
   document.getElementById("template-area").innerHTML =
     '<p style="text-align:center;color:#999;padding:20px;">Select a mode to begin</p>';
@@ -83,6 +110,8 @@ function startPracticeMode() {
   document.getElementById("mode-selector").style.display = "none";
   document.getElementById("rush-stats").style.display = "none";
   document.getElementById("practice-stats").style.display = "flex";
+  document.getElementById("how-to-play").style.display = "block";
+  document.getElementById("lightboard-section").style.display = "none";
 
   document.getElementById("resetBtn").style.display = "inline-block";
   document.getElementById("newBtn").style.display = "inline-block";
@@ -102,18 +131,22 @@ function startRushMode(minutes) {
   currentDifficulty = 1;
   maxDifficultyReached = 1;
   timeRemaining = minutes * 60;
+  rushStarted = false;
 
   hideModal();
   setBankAreaVisible(true);
   document.getElementById("mode-selector").style.display = "none";
   document.getElementById("rush-stats").style.display = "flex";
   document.getElementById("practice-stats").style.display = "none";
+  document.getElementById("how-to-play").style.display = "none";
   document.getElementById("resetBtn").style.display = "inline-block";
   document.getElementById("endRushBtn").style.display = "inline-block";
   document.getElementById("newBtn").style.display = "none";
 
+  clearLightboard();
+  document.getElementById("lightboard-section").style.display = "block";
+
   updateRushUI();
-  startTimer();
   newPuzzle();
 }
 
@@ -140,7 +173,7 @@ function updateTimerDisplay() {
   // Visual warning colors
   if (timeRemaining <= 10) timerEl.style.color = "#dc2626";
   else if (timeRemaining <= 30) timerEl.style.color = "#f59e0b";
-  else timerEl.style.color = "#059669";
+  else timerEl.style.color = "#ffffff";
 }
 
 function updateRushUI() {
@@ -157,8 +190,19 @@ function endRushMode() {
     rushTimer = null;
   }
 
+  document.getElementById("rush-ready-modal").style.display = "none";
+  document.getElementById("lightboard-section").querySelector(".lightboard-tim").style.display = "none";
+  rushIntroPlaying = false;
+
   const puzzlesSolvedEl = document.getElementById("puzzlesSolved");
   if (puzzlesSolvedEl) puzzlesSolvedEl.textContent = String(puzzlesSolved);
+
+  const timImg = document.getElementById("tim-img");
+  if (timImg) {
+    timImg.src = puzzlesSolved >= 5
+      ? "/static/images/tim-wave.svg"
+      : "/static/images/tim-front.svg";
+  }
 
   showModal();
 }
@@ -170,6 +214,19 @@ function showModal() {
 function hideModal() {
   const modal = document.getElementById("modal");
   if (modal) modal.style.display = "none";
+}
+
+function dismissRushModal() {
+  hideModal();
+  // Restore Tim to lightboard
+  const timEl = document.querySelector("#lightboard-section .lightboard-tim");
+  if (timEl) timEl.style.display = "";
+  // Swap End Rush → Menu now that rush is over
+  document.getElementById("endRushBtn").style.display = "none";
+  document.getElementById("menuBtn").style.display = "inline-block";
+  // Reveal the share icon now that the game is over and modal is gone
+  const shareBtn = document.getElementById("shareBtn");
+  if (shareBtn) shareBtn.style.display = "";
 }
 
 // ============================================================================
@@ -202,10 +259,7 @@ function unlockPageScroll() {
 // ============================================================================
 
 function newPuzzle() {
-  attempts = 0;
-  updateAttemptsUI();
-
-  let endpoint = "/api/puzzle/new?decoys=2";
+  let endpoint = "/api/puzzle/rush?difficulty=3&decoys=2";
 
   if (gameMode === "rush3" || gameMode === "rush5") {
     currentDifficulty = calculateDifficulty(puzzlesSolved);
@@ -225,8 +279,10 @@ function newPuzzle() {
 
       updateControls();
 
-      if (gameMode === "rush3" || gameMode === "rush5") updateRushUI();
-      else {
+      if (gameMode === "rush3" || gameMode === "rush5") {
+        updateRushUI();
+        if (!rushStarted) playWrongFillAnimation();
+      } else {
         const targetEl = document.getElementById("target");
         if (targetEl) targetEl.textContent = String(data.target);
       }
@@ -236,11 +292,6 @@ function newPuzzle() {
       const resultEl = document.getElementById("result");
       if (resultEl) resultEl.textContent = "Failed to fetch puzzle.";
     });
-}
-
-function updateAttemptsUI() {
-  const attemptsEl = document.getElementById("attempts");
-  if (attemptsEl) attemptsEl.textContent = String(attempts);
 }
 
 function renderTemplate(tokens) {
@@ -254,6 +305,9 @@ function renderTemplate(tokens) {
     "*": "×",
     "/": "÷",
   };
+
+  const row = document.createElement("div");
+  row.className = "equation-row";
 
   tokens.forEach((tok) => {
     const isSlot = tok.startsWith("{") ? tok.endsWith("}") : false;
@@ -276,14 +330,16 @@ function renderTemplate(tokens) {
         updateControls();
       });
 
-      container.appendChild(slot);
+      row.appendChild(slot);
     } else {
       const span = document.createElement("span");
       span.className = "inline-token";
       span.textContent = DISPLAY_OPS[tok] || tok;
-      container.appendChild(span);
+      row.appendChild(span);
     }
   });
+
+  container.appendChild(row);
 
   updateControls();
 }
@@ -367,9 +423,6 @@ function resetSlots() {
   if (!bank) return;
 
   document.querySelectorAll(".slot .bank-item").forEach((el) => bank.appendChild(el));
-
-  // attempts = 0;
-  updateAttemptsUI();
 
   const resultEl = document.getElementById("result");
   if (resultEl) resultEl.textContent = "";
@@ -457,6 +510,7 @@ function checkPuzzle() {
       if (data.reason === "correct") {
         if (gameMode === "rush3" || gameMode === "rush5") {
           puzzlesSolved += 1;
+          addEquationToLightboard(`${displayExpr} = ${puzzle.target}`);
 
           resultEl.textContent = `Correct! Level ${puzzlesSolved + 1}`;
           resultEl.className = "result success";
@@ -467,35 +521,13 @@ function checkPuzzle() {
         } else {
           resultEl.textContent = `Correct! ${displayExpr} = ${evalDisplay}`;
           resultEl.className = "result success";
-          attempts = 0;
-          updateAttemptsUI();
         }
         return;
       }
 
       if (data.reason === "wrong_value") {
-        if (gameMode === "rush3" || gameMode === "rush5") {
-          resultEl.textContent = `Incorrect. Got ${evalDisplay}, need ${puzzle.target}`;
-          resultEl.className = "result error";
-        } else {
-          attempts += 1;
-          updateAttemptsUI();
-
-          if (attempts >= 3) {
-            fetch(`/api/puzzle/reveal?round_id=${encodeURIComponent(puzzle.round_id)}`)
-              .then((r) => r.json())
-              .then((sol) => {
-                const displaySol = sol.solution
-                  .replace(/\*/g, "×")
-                  .replace(/\//g, "÷");
-                resultEl.textContent = `Incorrect. Your result = ${evalDisplay}. Solution: ${displaySol}`;
-                resultEl.className = "result reveal";
-              });
-          } else {
-            resultEl.textContent = `Incorrect. Your result = ${evalDisplay}. Attempts left: ${3 - attempts}`;
-            resultEl.className = "result error";
-          }
-        }
+        resultEl.textContent = `Incorrect. Got ${evalDisplay}, need ${puzzle.target}`;
+        resultEl.className = "result error";
         return;
       }
 
@@ -515,10 +547,94 @@ function canCheck() {
   return totalSlots > 0 && filledSlots === totalSlots;
 }
 
+function addEquationToLightboard(expr) {
+  const surface = document.getElementById("lightboard-surface");
+  if (!surface) return;
+
+  const zone = lightboardShuffledZones[lightboardZoneIndex % lightboardShuffledZones.length];
+  const palette = LIGHTBOARD_COLORS[lightboardZoneIndex % LIGHTBOARD_COLORS.length];
+  lightboardZoneIndex++;
+
+  const el = document.createElement("div");
+  el.className = "lightboard-eq";
+  el.textContent = expr;
+  el.style.left = zone[0] + "%";
+  el.style.top = zone[1] + "%";
+  el.style.color = palette.color;
+  el.style.textShadow = `0 0 8px ${palette.glow}, 0 0 18px ${palette.glow}`;
+  surface.appendChild(el);
+}
+
+function clearLightboard() {
+  const surface = document.getElementById("lightboard-surface");
+  if (surface) surface.innerHTML = "";
+  lightboardZoneIndex = 0;
+  lightboardShuffledZones = [...LIGHTBOARD_ZONES].sort(() => Math.random() - 0.5);
+  const timEl = document.getElementById("lightboard-section").querySelector(".lightboard-tim");
+  if (timEl) timEl.style.display = "";
+  const shareBtn = document.getElementById("shareBtn");
+  if (shareBtn) shareBtn.style.display = "none";
+}
+
 let autoCheckTimeout = null;
+
+function playWrongFillAnimation() {
+  rushIntroPlaying = true;
+  if (autoCheckTimeout !== null) {
+    clearTimeout(autoCheckTimeout);
+    autoCheckTimeout = null;
+  }
+
+  const slots = Array.from(document.querySelectorAll(".slot"));
+  const bankItems = Array.from(document.querySelectorAll("#bank .bank-item"));
+  if (slots.length === 0 || bankItems.length === 0) {
+    rushIntroPlaying = false;
+    return;
+  }
+
+  // Shuffle both items AND slots independently for maximum whimsy
+  const shuffledItems = [...bankItems].sort(() => Math.random() - 0.5);
+  const shuffledSlots = [...slots].sort(() => Math.random() - 0.5);
+  const count = Math.min(slots.length, shuffledItems.length);
+
+  // Half-speed for the intro — double both the flight duration and the stagger gaps
+  const INTRO_ANIM_MS = SNAP_ANIM_MS * 2;
+
+  // Random stagger (200–560 ms gaps) so tiles feel organic, not mechanical
+  const delays = [0];
+  for (let i = 1; i < count; i++) {
+    delays.push(delays[i - 1] + 200 + Math.floor(Math.random() * 360));
+  }
+  const allLanded = delays[count - 1] + INTRO_ANIM_MS + 320;
+
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => animateSnapAndPlace(shuffledItems[i], shuffledSlots[i], INTRO_ANIM_MS), delays[i]);
+  }
+
+  // After all tiles land: cancel any snuck-through auto-check, show brief feedback, then reset
+  setTimeout(() => {
+    if (autoCheckTimeout !== null) {
+      clearTimeout(autoCheckTimeout);
+      autoCheckTimeout = null;
+    }
+    const resultEl = document.getElementById("result");
+    setTimeout(() => {
+      resetSlots();
+      if (resultEl) resultEl.textContent = "";
+      if (!rushStarted) {
+        // First puzzle: show ready modal — timer starts only when clicked through
+        document.getElementById("rush-ready-modal").style.display = "flex";
+      } else {
+        // Subsequent puzzles: timer is running, just unlock interaction
+        rushIntroPlaying = false;
+      }
+    }, 700);
+  }, allLanded);
+}
 
 function updateControls() {
   if (!puzzle) return;
+  if (rushIntroPlaying) return;
 
   if (!canCheck()) return;
 
@@ -527,6 +643,7 @@ function updateControls() {
   autoCheckTimeout = setTimeout(() => {
     autoCheckTimeout = null;
     if (!puzzle) return;
+    if (rushIntroPlaying) return;
     if (canCheck()) checkPuzzle();
   }, 300);
 }
@@ -637,7 +754,7 @@ function makeVisualClone(el, className) {
   return clone;
 }
 
-function animateSnapAndPlace(el, slot) {
+function animateSnapAndPlace(el, slot, animMs = SNAP_ANIM_MS) {
   document.body.classList.remove("dragging");
   if (el.parentElement === slot) return;
 
@@ -668,7 +785,7 @@ function animateSnapAndPlace(el, slot) {
 
   requestAnimationFrame(() => {
     // Fixed: removed literal dollar signs in CSS strings
-    clone.style.transition = `transform ${SNAP_ANIM_MS}ms cubic-bezier(.2,.9,.2,1), opacity ${SNAP_ANIM_MS}ms ease`;
+    clone.style.transition = `transform ${animMs}ms cubic-bezier(.2,.9,.2,1), opacity ${animMs}ms ease`;
     clone.style.transform = `translate(${dx}px, ${dy}px) scale(1.01)`;
     clone.style.opacity = "0.99";
   });
@@ -686,7 +803,7 @@ function animateSnapAndPlace(el, slot) {
     slot.appendChild(el);
     el.style.visibility = "";
     el.classList.add("placed");
-    setTimeout(() => el.classList.remove("placed"), SNAP_ANIM_MS + 40);
+    setTimeout(() => el.classList.remove("placed"), animMs + 40);
 
     delete el.dataset.animating;
     el.draggable = false;
@@ -694,7 +811,7 @@ function animateSnapAndPlace(el, slot) {
   };
 
   clone.addEventListener("transitionend", cleanup);
-  setTimeout(cleanup, SNAP_ANIM_MS + 220);
+  setTimeout(cleanup, animMs + 220);
 }
 
 // ============================================================================
@@ -991,6 +1108,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  const rushReadyBtn = document.getElementById("rushReadyBtn");
+  if (rushReadyBtn) {
+    rushReadyBtn.addEventListener("click", () => {
+      document.getElementById("rush-ready-modal").style.display = "none";
+      rushStarted = true;
+      rushIntroPlaying = false;
+      startTimer();
+    });
+  }
+
   // Modal buttons
   const playAgainBtn = document.getElementById("playAgainBtn");
   if (playAgainBtn) {
@@ -1002,6 +1129,58 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const backToMenuBtn = document.getElementById("backToMenuBtn");
   if (backToMenuBtn) backToMenuBtn.addEventListener("click", showMenu);
+
+  // X button and click-outside both dismiss the game-over modal
+  const gameOverModal = document.getElementById("modal");
+  if (gameOverModal) {
+    gameOverModal.addEventListener("click", (ev) => {
+      if (ev.target === gameOverModal) dismissRushModal();
+    });
+  }
+
+  const modalCloseBtn = document.getElementById("modalCloseBtn");
+  if (modalCloseBtn) {
+    modalCloseBtn.addEventListener("click", dismissRushModal);
+  }
+
+  // Share / download lightboard (icon excluded from capture via ignoreElements)
+  const shareBtn = document.getElementById("shareBtn");
+  if (shareBtn) {
+    shareBtn.addEventListener("click", () => {
+      const board = document.getElementById("lightboard");
+      if (!board || typeof html2canvas === "undefined") return;
+
+      shareBtn.disabled = true;
+
+      html2canvas(board, {
+        useCORS: true,
+        scale: 2,
+        ignoreElements: (el) => el === shareBtn,
+      }).then((canvas) => {
+        shareBtn.disabled = false;
+
+        canvas.toBlob((blob) => {
+          const file = new File([blob], "arithmix-lightboard.png", { type: "image/png" });
+
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            navigator.share({
+              title: "ARITHMIX Lightboard",
+              files: [file],
+            }).catch(() => {});
+          } else {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "arithmix-lightboard.png";
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 10000);
+          }
+        }, "image/png");
+      }).catch(() => {
+        shareBtn.disabled = false;
+      });
+    });
+  }
 
   // Template area drag/drop
   const template = document.getElementById("template-area");
