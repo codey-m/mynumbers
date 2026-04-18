@@ -26,9 +26,13 @@ h1.logo-banner {
   align-items: center;
   justify-content: center;
   gap: 0;
-  margin: 0 0 24px;
+  margin: 0 0 16px;
   font-size: 0;
   user-select: none;
+}
+
+body.menu-mode h1.logo-banner {
+  margin-bottom: 60px;
 }
 
 .logo-tile {

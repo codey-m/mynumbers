@@ -82,6 +82,7 @@ function showMenu() {
   const menuBtn = document.getElementById("menuBtn");
   if (menuBtn) menuBtn.style.display = "none";
 
+  document.body.classList.add("menu-mode");
   document.getElementById("mode-selector").style.display = "flex";
   document.getElementById("rush-stats").style.display = "none";
   document.getElementById("practice-stats").style.display = "none";
@@ -105,6 +106,7 @@ function showMenu() {
 
 function startPracticeMode() {
   gameMode = "practice";
+  document.body.classList.remove("menu-mode");
   hideModal();
   hideHomeLightboard();
   setBankAreaVisible(true);
@@ -125,6 +127,7 @@ function startPracticeMode() {
 
 function startRushMode(minutes) {
   gameMode = minutes === 3 ? "rush3" : "rush5";
+  document.body.classList.remove("menu-mode");
   hideHomeLightboard();
 
   const menuBtn = document.getElementById("menuBtn");
@@ -624,7 +627,7 @@ function playWrongFillAnimation() {
     setTimeout(() => {
       resetSlots();
       if (resultEl) resultEl.textContent = "";
-      if (!rushStarted) {
+      if (!rushStarted && rushIntroPlaying) {
         // First puzzle: show ready modal — timer starts only when clicked through
         document.getElementById("rush-ready-modal").style.display = "flex";
       } else {
