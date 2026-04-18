@@ -4,13 +4,15 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>ARITHMIX</title>
-  <link rel="stylesheet" href="styles.css?v=25" />
+  <link rel="stylesheet" href="styles.css?v=28" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Fredoka+One&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="container">
-    <h1>ARITHMIX</h1>
+    <h1 class="logo-banner" aria-label="ARITHMIX">
+      <span class="logo-tile lt-a">A</span><span class="logo-tile lt-r">R</span><span class="logo-tile lt-i">I</span><span class="logo-tile lt-t">T</span><span class="logo-tile lt-h">H</span><span class="logo-tile lt-m">M</span><span class="logo-tile lt-i2">I</span><span class="logo-tile lt-x">X</span>
+    </h1>
 
     <!-- Mode Selection (shown at start) -->
     <div class="mode-selector" id="mode-selector">
@@ -63,6 +65,15 @@
 
     <div id="result" class="result" role="status"></div>
 
+    <!-- Home lightboard (visible on menu only) -->
+    <div id="home-lightboard-section" class="lightboard-section" style="display:none;">
+      <div class="lightboard" id="home-lightboard">
+        <img class="lightboard-tim" src="/static/images/tim-wave.svg" alt="Tim" />
+        <div class="home-lb-surface" id="home-lb-surface"></div>
+        <canvas class="home-lb-canvas" id="home-lb-canvas"></canvas>
+      </div>
+    </div>
+
     <!-- Lightboard (rush mode only) -->
     <div id="lightboard-section" class="lightboard-section" style="display: none;">
       <div class="lightboard" id="lightboard">
@@ -106,6 +117,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="game.js?v=28"></script>
+  <script src="game.js?v=31"></script>
 </body>
 </html>

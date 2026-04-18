@@ -20,6 +20,50 @@ h1 {
   margin: 0 0 12px;
 }
 
+/* ── Logo banner ── */
+h1.logo-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin: 0 0 24px;
+  font-size: 0;
+  user-select: none;
+}
+
+.logo-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 36px;
+  font-family: 'Fredoka One', cursive;
+  font-weight: 400;
+  font-size: 21px;
+  color: #fff;
+  border-radius: 5px;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.25);
+}
+
+.logo-paren {
+  font-family: 'Fredoka One', cursive;
+  font-size: 26px;
+  font-weight: 400;
+  color: #40464c;
+  line-height: 1;
+  padding: 0 1px;
+}
+
+/* Per-letter colors — MIT standard + extended palette */
+.lt-a  { background: #ff1423; } /* Bright Red     */
+.lt-r  { background: #750062; } /* Dark Pink      */
+.lt-i  { background: #ff14f0; } /* Pink           */
+.lt-t  { background: #9933ff; } /* Purple         */
+.lt-h  { background: #002896; } /* Dark Blue      */
+.lt-m  { background: #1966ff; } /* Blue           */
+.lt-i2 { background: #004d1a; } /* Dark Green     */
+.lt-x  { background: #750014; } /* MIT Red        */
+
 
 /* Template area (equation display) */
 .template-area {
@@ -540,6 +584,7 @@ body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
 .lightboard {
   position: relative;
   width: 100%;
+  box-sizing: border-box;
   height: 300px;
   background: #07071a;
   border-radius: 10px;
@@ -628,6 +673,33 @@ body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
 .lightboard-share-btn:hover {
   background: rgba(30, 30, 70, 0.92);
   color: #fff;
+}
+
+/* ── Home lightboard overlays ── */
+.home-lb-surface {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.home-lb-item {
+  position: absolute;
+  font-family: 'Caveat', cursive;
+  font-size: 24px;
+  font-weight: 600;
+  white-space: nowrap;
+  line-height: 1;
+  clip-path: inset(0 100% 0 0);
+  animation: lb-write-in 1.1s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.home-lb-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
 }
 
 /* Empty state message */

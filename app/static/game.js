@@ -26,8 +26,8 @@ const LIGHTBOARD_ZONES = [
   [2, 5],  [36, 5],  [68, 5],
   [2, 24], [36, 24], [68, 24],
   [2, 43], [36, 43], [68, 43],
-  [2, 62], [36, 62], [68, 62],
-  [2, 80], [36, 80], [68, 80],
+  [2, 62],           [68, 62],   // center omitted — Tim occupies bottom-center
+  [2, 80],           [68, 80],   // center omitted — Tim occupies bottom-center
 ];
 
 const LIGHTBOARD_COLORS = [
@@ -88,6 +88,7 @@ function showMenu() {
   document.getElementById("how-to-play").style.display = "none";
   document.getElementById("rush-ready-modal").style.display = "none";
   document.getElementById("lightboard-section").style.display = "none";
+  showHomeLightboard();
 
   document.getElementById("template-area").innerHTML =
     '<p style="text-align:center;color:#999;padding:20px;">Select a mode to begin</p>';
@@ -105,6 +106,7 @@ function showMenu() {
 function startPracticeMode() {
   gameMode = "practice";
   hideModal();
+  hideHomeLightboard();
   setBankAreaVisible(true);
 
   document.getElementById("mode-selector").style.display = "none";
@@ -123,6 +125,7 @@ function startPracticeMode() {
 
 function startRushMode(minutes) {
   gameMode = minutes === 3 ? "rush3" : "rush5";
+  hideHomeLightboard();
 
   const menuBtn = document.getElementById("menuBtn");
   if (menuBtn) menuBtn.style.display = "none";
@@ -1065,6 +1068,364 @@ function animatePointerCloneIntoSlot({ dragClone, originEl, slot }) {
 }
 
 // ============================================================================
+// HOME LIGHTBOARD
+// ============================================================================
+
+const HOME_LB_ITEMS = [
+  // top band — full width
+  { text: "e^(iπ) + 1 = 0", x:  2, y:  4, color: "#ff6ec7", glow: "rgba(255,110,199,0.5)" },
+  { text: "π ≈ 3.14159",     x: 60, y:  4, color: "#00d4ff", glow: "rgba(0,212,255,0.5)"   },
+  // second band — center + right (left reserved for graph ~x:10–24%)
+  { text: "E = mc²",         x: 36, y: 15, color: "#ffe033", glow: "rgba(255,224,51,0.5)"  },
+  { text: "√2 ≈ 1.414",      x: 64, y: 23, color: "#ff9d00", glow: "rgba(255,157,0,0.5)"   },
+  // third band
+  { text: "F = ma",          x: 27, y: 31, color: "#39ff14", glow: "rgba(57,255,20,0.5)"   },
+  { text: "Est. 1861",       x: 55, y: 37, color: "#c77dff", glow: "rgba(199,125,255,0.5)" },
+  // fourth band — just above Tim (top ≤ 41%)
+  { text: "∑ 1/n² = π²/6",  x: 27, y: 43, color: "#00d4ff", glow: "rgba(0,212,255,0.5)"   },
+  // bottom-left safe column (clear of Tim's centre)
+  { text: "Mens et Manus",   x:  2, y: 60, color: "#ff6ec7", glow: "rgba(255,110,199,0.5)" },
+  { text: "ℏω = E",          x:  2, y: 76, color: "#ffe033", glow: "rgba(255,224,51,0.5)"  },
+];
+
+let homeLbAnimId  = null;
+let homeLbStars   = [];
+let homeLbStar    = null;    // active shooting star
+let homeLbFw      = null;    // active firework
+let homeLbGearAng = 0;
+
+// ── Stars ──────────────────────────────────────────────────────────────────
+function homeLbMakeStars(w, h) {
+  // Fixed fractional positions in safe zones (avoiding Tim's bottom-center 50%)
+  const pts = [
+    [0.05,0.08],[0.28,0.06],[0.50,0.15],[0.72,0.10],[0.92,0.08],
+    [0.15,0.22],[0.45,0.28],[0.65,0.30],[0.85,0.24],[0.20,0.34],
+    [0.04,0.58],[0.10,0.76],[0.07,0.88],               // bottom-left
+    [0.88,0.60],[0.94,0.76],[0.91,0.88],[0.80,0.82],   // bottom-right
+  ];
+  return pts.map(([px,py], i) => ({
+    x: px * w, y: py * h,
+    phase: (i / pts.length) * Math.PI * 2,
+    size: 1.5 + (i % 3) * 0.65,
+  }));
+}
+
+function homeLbDrawStars(ctx, ts) {
+  homeLbStars.forEach(s => {
+    const alpha = 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(ts * 0.0018 + s.phase));
+    const r     = s.size * (0.85 + 0.15 * Math.sin(ts * 0.003 + s.phase + 1));
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle   = "#fff";
+    ctx.shadowColor = "#ffe033";
+    ctx.shadowBlur  = 4;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a   = (i / 8) * Math.PI * 2;
+      const rad = i % 2 === 0 ? r : r * 0.35;
+      i === 0
+        ? ctx.moveTo(s.x + rad * Math.cos(a), s.y + rad * Math.sin(a))
+        : ctx.lineTo(s.x + rad * Math.cos(a), s.y + rad * Math.sin(a));
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+// ── Shooting star ───────────────────────────────────────────────────────────
+function homeLbNewStar(w, h) {
+  return {
+    x: w * (0.02 + Math.random() * 0.22),
+    y: h * (0.03 + Math.random() * 0.22),
+    vx: w * 0.00055, vy: h * 0.00018,
+    trail: [], start: null, dur: 2000,
+  };
+}
+
+function homeLbTickStar(ctx, s, ts) {
+  if (!s.start) s.start = ts;
+  const t = (ts - s.start) / s.dur;
+  if (t >= 1) return true;
+  s.x += s.vx; s.y += s.vy;
+  s.trail.push({ x: s.x, y: s.y });
+  if (s.trail.length > 28) s.trail.shift();
+  const alpha = t < 0.12 ? t / 0.12 : t > 0.75 ? (1 - t) / 0.25 : 1;
+  s.trail.forEach((p, i) => {
+    const tf = i / s.trail.length;
+    ctx.save(); ctx.globalAlpha = alpha * tf * 0.55;
+    ctx.fillStyle = "#ffe033";
+    ctx.beginPath(); ctx.arc(p.x, p.y, tf * 2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  });
+  ctx.save(); ctx.globalAlpha = alpha;
+  ctx.fillStyle = "#fff"; ctx.shadowColor = "#ffe033"; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(s.x, s.y, 2.5, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  return false;
+}
+
+// ── Firework ────────────────────────────────────────────────────────────────
+const FW_COLORS = ["#ff1423","#ff6ec7","#ffe033","#00d4ff","#c77dff","#39ff14","#ff9d00"];
+
+function homeLbNewFw(w, h) {
+  const left = Math.random() > 0.5;
+  const sx = left ? w * 0.07 : w * 0.93;
+  const ex = sx + (left ? 1 : -1) * w * (0.04 + Math.random() * 0.10);
+  const ey = h * (0.10 + Math.random() * 0.28);
+  return { phase:"launch", sx, x:sx, y:h, ex, ey, start:null, launchMs:900, explodeAt:null, particles:[] };
+}
+
+function homeLbTickFw(ctx, fw, ts) {
+  if (!fw.start) fw.start = ts;
+  if (fw.phase === "launch") {
+    const p = Math.min((ts - fw.start) / fw.launchMs, 1);
+    fw.x = fw.sx + (fw.ex - fw.sx) * p;
+    fw.y = fw.y + (fw.ey - fw.y) * (p < 1 ? 0.08 : 1); // ease up
+    ctx.save(); ctx.globalAlpha = 0.9;
+    ctx.fillStyle = "#fff"; ctx.shadowColor = "#fff"; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.arc(fw.x, fw.y, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    if (p >= 1) {
+      fw.phase = "explode"; fw.explodeAt = ts;
+      fw.x = fw.ex; fw.y = fw.ey;
+      for (let i = 0; i < 32; i++) {
+        const a   = (i / 32) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+        const spd = 1 + Math.random() * 2.2;
+        fw.particles.push({
+          x: fw.x, y: fw.y,
+          vx: Math.cos(a) * spd, vy: Math.sin(a) * spd,
+          color: FW_COLORS[i % FW_COLORS.length],
+          r: 1.5 + Math.random() * 1.5,
+        });
+      }
+    }
+  } else {
+    const elapsed = ts - fw.explodeAt, dur = 2300, p = elapsed / dur;
+    if (p >= 1) return true;
+    fw.particles.forEach(pt => {
+      pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.05;
+      ctx.save(); ctx.globalAlpha = 1 - p;
+      ctx.fillStyle = pt.color; ctx.shadowColor = pt.color; ctx.shadowBlur = 5;
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.r * (1 - p * 0.5), 0, Math.PI * 2);
+      ctx.fill(); ctx.restore();
+    });
+  }
+  return false;
+}
+
+// ── Sine-wave graph ─────────────────────────────────────────────────────────
+function homeLbDrawGraph(ctx, cx, cy, gw, gh, ts) {
+  ctx.save();
+
+  // Axes
+  ctx.globalAlpha = 0.55;
+  ctx.strokeStyle = "#39ff14";
+  ctx.lineWidth   = 1.3;
+  ctx.shadowColor = "#39ff14";
+  ctx.shadowBlur  = 5;
+
+  // x-axis
+  ctx.beginPath();
+  ctx.moveTo(cx - gw / 2, cy);
+  ctx.lineTo(cx + gw / 2, cy);
+  ctx.stroke();
+
+  // y-axis
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - gh / 2);
+  ctx.lineTo(cx, cy + gh / 2);
+  ctx.stroke();
+
+  // Arrow tips
+  const ar = 5;
+  ctx.beginPath();
+  ctx.moveTo(cx + gw / 2, cy);
+  ctx.lineTo(cx + gw / 2 - ar, cy - 3);
+  ctx.moveTo(cx + gw / 2, cy);
+  ctx.lineTo(cx + gw / 2 - ar, cy + 3);
+  ctx.moveTo(cx, cy - gh / 2);
+  ctx.lineTo(cx - 3, cy - gh / 2 + ar);
+  ctx.moveTo(cx, cy - gh / 2);
+  ctx.lineTo(cx + 3, cy - gh / 2 + ar);
+  ctx.stroke();
+
+  // Scrolling sine wave
+  const phase = ts * 0.001;
+  ctx.globalAlpha = 0.9;
+  ctx.strokeStyle = "#ff6ec7";
+  ctx.lineWidth   = 2;
+  ctx.shadowColor = "#ff6ec7";
+  ctx.shadowBlur  = 7;
+  ctx.beginPath();
+  const segs = 80;
+  for (let i = 0; i <= segs; i++) {
+    const t = i / segs;
+    const x = cx - gw / 2 + 4 + t * (gw - 8);
+    const y = cy - (gh / 2 - 7) * Math.sin(t * Math.PI * 2 + phase);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Axis tick marks
+  ctx.globalAlpha = 0.35;
+  ctx.strokeStyle = "#39ff14";
+  ctx.lineWidth   = 1;
+  ctx.shadowBlur  = 0;
+  [0.25, 0.5, 0.75].forEach(f => {
+    const xp = cx - gw / 2 + f * gw;
+    ctx.beginPath(); ctx.moveTo(xp, cy - 3); ctx.lineTo(xp, cy + 3); ctx.stroke();
+  });
+  [-0.35, 0.35].forEach(f => {
+    const yp = cy + f * gh;
+    ctx.beginPath(); ctx.moveTo(cx - 3, yp); ctx.lineTo(cx + 3, yp); ctx.stroke();
+  });
+
+  ctx.restore();
+}
+
+// ── Matrix ───────────────────────────────────────────────────────────────────
+function homeLbDrawMatrix(ctx, cx, cy, cellW, cellH) {
+  const vals = [[2, -1, 0], [-1, 2, -1], [0, -1, 2]];
+  const cols = vals[0].length, rows = vals.length;
+  const mw = cellW * cols, mh = cellH * rows;
+  const left = cx - mw / 2, top = cy - mh / 2;
+
+  ctx.save();
+  ctx.globalAlpha = 0.78;
+  ctx.fillStyle   = "#c77dff";
+  ctx.shadowColor = "#c77dff";
+  ctx.shadowBlur  = 8;
+  ctx.font        = `600 ${Math.round(cellH * 0.72)}px 'Caveat', cursive`;
+  ctx.textAlign   = "center";
+  ctx.textBaseline = "middle";
+
+  vals.forEach((row, r) =>
+    row.forEach((v, c) =>
+      ctx.fillText(v, left + c * cellW + cellW / 2, top + r * cellH + cellH / 2)
+    )
+  );
+
+  // Square brackets
+  ctx.strokeStyle = "#c77dff";
+  ctx.lineWidth   = 2;
+  ctx.shadowBlur  = 6;
+  const bw = 7, pad = 4;
+  [[left - pad, left - pad + bw], [left + mw + pad - bw, left + mw + pad]].forEach(([x0, x1]) => {
+    const isLeft = x1 < cx;
+    ctx.beginPath();
+    ctx.moveTo(isLeft ? x1 : x0, top - pad);
+    ctx.lineTo(isLeft ? x0 : x1, top - pad);
+    ctx.lineTo(isLeft ? x0 : x1, top + mh + pad);
+    ctx.lineTo(isLeft ? x1 : x0, top + mh + pad);
+    ctx.stroke();
+  });
+
+  ctx.restore();
+}
+
+// ── Gear ────────────────────────────────────────────────────────────────────
+function homeLbDrawGear(ctx, cx, cy, r, angle) {
+  const teeth = 8, inner = r * 0.68, tooth = r * 0.38, hole = r * 0.28;
+  ctx.save();
+  ctx.translate(cx, cy); ctx.rotate(angle);
+  ctx.globalAlpha = 0.45;
+  ctx.strokeStyle = "#c77dff"; ctx.fillStyle = "rgba(199,125,255,0.12)";
+  ctx.lineWidth = 1.5; ctx.shadowColor = "#c77dff"; ctx.shadowBlur = 7;
+  ctx.beginPath();
+  for (let i = 0; i < teeth; i++) {
+    const a1 = (i / teeth) * Math.PI * 2,        a2 = ((i + 0.4) / teeth) * Math.PI * 2,
+          a3 = ((i + 0.6) / teeth) * Math.PI * 2, a4 = ((i + 1)   / teeth) * Math.PI * 2;
+    ctx.lineTo(Math.cos(a1) * inner,        Math.sin(a1) * inner);
+    ctx.lineTo(Math.cos(a2) * (inner+tooth), Math.sin(a2) * (inner+tooth));
+    ctx.lineTo(Math.cos(a3) * (inner+tooth), Math.sin(a3) * (inner+tooth));
+    ctx.lineTo(Math.cos(a4) * inner,        Math.sin(a4) * inner);
+  }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0, 0, hole, 0, Math.PI * 2);
+  ctx.globalAlpha = 0.7; ctx.stroke();
+  ctx.restore();
+}
+
+// ── Orchestration ───────────────────────────────────────────────────────────
+function showHomeLightboard() {
+  const sec = document.getElementById("home-lightboard-section");
+  if (sec) sec.style.display = "";
+
+  // Repopulate every visit so the write-in animation replays fresh each time
+  const surface = document.getElementById("home-lb-surface");
+  if (surface) {
+    surface.innerHTML = "";
+    HOME_LB_ITEMS.forEach((item, i) => {
+      const el = document.createElement("div");
+      el.className = "home-lb-item";
+      el.textContent = item.text;
+      el.style.left           = item.x + "%";
+      el.style.top            = item.y + "%";
+      el.style.color          = item.color;
+      el.style.textShadow     = `0 0 8px ${item.glow}, 0 0 18px ${item.glow}`;
+      el.style.animationDelay = (i * 0.9) + "s";  // one at a time
+      surface.appendChild(el);
+    });
+  }
+
+  const canvas = document.getElementById("home-lb-canvas");
+  const lb     = document.getElementById("home-lightboard");
+  if (!canvas || !lb || homeLbAnimId) return;
+
+  canvas.width  = lb.offsetWidth  || 640;
+  canvas.height = lb.offsetHeight || 300;
+  if (!homeLbStars.length) homeLbStars = homeLbMakeStars(canvas.width, canvas.height);
+
+  const w = canvas.width, h = canvas.height;
+  // Static positions for permanent canvas elements
+  const gearX   = w * 0.925, gearY  = h * 0.14,  gearR  = h * 0.075;
+  const graphCX = w * 0.17,  graphCY = h * 0.34,  graphW = w * 0.13, graphH = h * 0.30;
+  const matCX   = w * 0.83,  matCY  = h * 0.70,  matCW  = w * 0.055, matCH = h * 0.115;
+  let starNext = Infinity, fwNext = Infinity, initialized = false;
+
+  function frame(ts) {
+    homeLbAnimId = requestAnimationFrame(frame);
+    if (!initialized) {
+      initialized = true;
+      starNext = ts + 1800;
+      fwNext   = ts + 4500;
+    }
+
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, w, h);
+
+    homeLbDrawStars(ctx, ts);
+    homeLbDrawGraph(ctx, graphCX, graphCY, graphW, graphH, ts);
+    homeLbDrawMatrix(ctx, matCX, matCY, matCW, matCH);
+
+    if (!homeLbStar && ts >= starNext) {
+      homeLbStar = homeLbNewStar(w, h);
+      starNext   = ts + 7000 + Math.random() * 4000;
+    }
+    if (homeLbStar && homeLbTickStar(ctx, homeLbStar, ts)) homeLbStar = null;
+
+    if (!homeLbFw && ts >= fwNext) {
+      homeLbFw = homeLbNewFw(w, h);
+      fwNext   = ts + 9000 + Math.random() * 5000;
+    }
+    if (homeLbFw && homeLbTickFw(ctx, homeLbFw, ts)) homeLbFw = null;
+
+    homeLbGearAng += 0.006;
+    homeLbDrawGear(ctx, gearX, gearY, gearR, homeLbGearAng);
+  }
+  homeLbAnimId = requestAnimationFrame(frame);
+}
+
+function hideHomeLightboard() {
+  const sec = document.getElementById("home-lightboard-section");
+  if (sec) sec.style.display = "none";
+  if (homeLbAnimId) { cancelAnimationFrame(homeLbAnimId); homeLbAnimId = null; }
+  homeLbStar = null;
+  homeLbFw   = null;
+}
+
+// ============================================================================
 // INITIALIZATION
 // ============================================================================
 
@@ -1146,25 +1507,80 @@ document.addEventListener("DOMContentLoaded", () => {
   // Share / download lightboard (icon excluded from capture via ignoreElements)
   const shareBtn = document.getElementById("shareBtn");
   if (shareBtn) {
-    shareBtn.addEventListener("click", () => {
+    shareBtn.addEventListener("click", async () => {
       const board = document.getElementById("lightboard");
       if (!board || typeof html2canvas === "undefined") return;
 
       shareBtn.disabled = true;
 
-      html2canvas(board, {
-        useCORS: true,
-        scale: 2,
-        ignoreElements: (el) => el === shareBtn,
-      }).then((canvas) => {
-        shareBtn.disabled = false;
+      try {
+        const scale = 2;
+        const boardRect = board.getBoundingClientRect();
+        const w = Math.round(boardRect.width * scale);
+        const h = Math.round(boardRect.height * scale);
 
-        canvas.toBlob((blob) => {
+        // Composite manually so the Tim SVG img renders correctly —
+        // html2canvas struggles with SVG <img> elements but native drawImage handles them fine.
+        const out = document.createElement("canvas");
+        out.width = w;
+        out.height = h;
+        const ctx = out.getContext("2d");
+
+        ctx.fillStyle = "#07071a";
+        ctx.fillRect(0, 0, w, h);
+
+        const timImg = board.querySelector(".lightboard-tim");
+        if (timImg && timImg.complete) {
+          const tr = timImg.getBoundingClientRect();
+          ctx.globalAlpha = 0.62;
+          ctx.filter = "brightness(0.9) saturate(0.85)";
+          ctx.drawImage(
+            timImg,
+            (tr.left - boardRect.left) * scale,
+            (tr.top  - boardRect.top)  * scale,
+            tr.width  * scale,
+            tr.height * scale
+          );
+          ctx.filter = "none";
+          ctx.globalAlpha = 1;
+        }
+
+        const surface = document.getElementById("lightboard-surface");
+        const eqCanvas = await html2canvas(surface, {
+          useCORS: true,
+          scale,
+          backgroundColor: null,
+        });
+        ctx.drawImage(eqCanvas, 0, 0);
+
+        // Footer strip with "Play ARITHMIX!" link text
+        const GAME_URL = "https://mynumbers.onrender.com/static/game.html";
+        const footerH = 36 * scale;
+        const fullH = h + footerH;
+        const final = document.createElement("canvas");
+        final.width = w;
+        final.height = fullH;
+        const fc = final.getContext("2d");
+        fc.drawImage(out, 0, 0);
+        fc.fillStyle = "#07071a";
+        fc.fillRect(0, h, w, footerH);
+        fc.fillStyle = "#1e1e36";
+        fc.fillRect(0, h, w, 2 * scale);
+        fc.font = `${13 * scale}px 'Caveat', cursive`;
+        fc.textAlign = "center";
+        fc.textBaseline = "middle";
+        fc.fillStyle = "#00d4ff";
+        fc.fillText("Play ARITHMIX!  →  " + GAME_URL, w / 2, h + footerH / 2);
+
+        final.toBlob((blob) => {
+          shareBtn.disabled = false;
           const file = new File([blob], "arithmix-lightboard.png", { type: "image/png" });
 
           if (navigator.canShare && navigator.canShare({ files: [file] })) {
             navigator.share({
               title: "ARITHMIX Lightboard",
+              text: "Play ARITHMIX!",
+              url: GAME_URL,
               files: [file],
             }).catch(() => {});
           } else {
@@ -1175,10 +1591,10 @@ document.addEventListener("DOMContentLoaded", () => {
             a.click();
             setTimeout(() => URL.revokeObjectURL(url), 10000);
           }
-        }, "image/png");
-      }).catch(() => {
+        }, "image/png");  // final.toBlob
+      } catch {
         shareBtn.disabled = false;
-      });
+      }
     });
   }
 
