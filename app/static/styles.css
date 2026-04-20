@@ -35,6 +35,14 @@ body.menu-mode h1.logo-banner {
   margin-bottom: 60px;
 }
 
+body.menu-mode .logo-tile {
+  width: 52px;
+  height: 56px;
+  font-size: 32px;
+  border-radius: 8px;
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.25);
+}
+
 .logo-tile {
   display: inline-flex;
   align-items: center;
@@ -496,6 +504,13 @@ body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
   font-weight: 600;
 }
 
+.lightboard-preview {
+  display: block;
+  width: 100%;
+  border-radius: 8px;
+  margin: 12px 0 4px;
+}
+
 .modal-desc {
   text-align: center;
   color: #374151;
@@ -695,8 +710,9 @@ body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
   font-weight: 600;
   white-space: nowrap;
   line-height: 1;
+  padding-right: 12px;
   clip-path: inset(0 100% 0 0);
-  animation: lb-write-in 1.1s cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation: lb-write-in 2.5s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
 .home-lb-canvas {

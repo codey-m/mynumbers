@@ -1,4 +1,4 @@
-console.log("game.js v28 loaded - Rush Mode Edition");
+console.log("game.js v36 loaded - Rush Mode Edition");
 
 // ============================================================================
 // STATE MANAGEMENT
@@ -15,6 +15,10 @@ let currentDifficulty = 1;
 let maxDifficultyReached = 1;
 let rushIntroPlaying = false;
 let rushStarted = false;
+
+// Share state (captured at end of rush, before Tim is hidden)
+let currentShareBlob = null;
+let currentShareBlobURL = null;
 
 // Lightboard
 let lightboardZoneIndex = 0;
@@ -44,6 +48,8 @@ const SNAP_THRESHOLD = 120;
 const SNAP_ANIM_MS = 180;
 const TAP_MOVE_PX = 18;
 const CLICK_SUPPRESS_MS = 1200;
+
+const GAME_URL = "https://mynumbers.onrender.com/static/game.html";
 
 let suppressClickUntil = 0;
 let pointerState = null;
@@ -190,15 +196,72 @@ function updateRushUI() {
   if (targetEl) targetEl.textContent = puzzle ? String(puzzle.target) : "—";
 }
 
-function endRushMode() {
+async function captureShareBlob() {
+  const board = document.getElementById("lightboard");
+  if (!board || typeof html2canvas === "undefined") return null;
+
+  const scale = 2;
+  const boardRect = board.getBoundingClientRect();
+  const w = Math.round(boardRect.width * scale);
+  const h = Math.round(boardRect.height * scale);
+
+  const out = document.createElement("canvas");
+  out.width = w;
+  out.height = h;
+  const ctx = out.getContext("2d");
+
+  ctx.fillStyle = "#07071a";
+  ctx.fillRect(0, 0, w, h);
+
+  const timImg = board.querySelector(".lightboard-tim");
+  if (timImg && timImg.complete) {
+    const tr = timImg.getBoundingClientRect();
+    ctx.globalAlpha = 0.62;
+    ctx.filter = "brightness(0.9) saturate(0.85)";
+    ctx.drawImage(
+      timImg,
+      (tr.left - boardRect.left) * scale,
+      (tr.top  - boardRect.top)  * scale,
+      tr.width  * scale,
+      tr.height * scale
+    );
+    ctx.filter = "none";
+    ctx.globalAlpha = 1;
+  }
+
+  const surface = document.getElementById("lightboard-surface");
+  const eqCanvas = await html2canvas(surface, {
+    useCORS: true,
+    scale,
+    backgroundColor: null,
+  });
+  ctx.drawImage(eqCanvas, 0, 0);
+
+  return new Promise((resolve) => {
+    out.toBlob((blob) => resolve(blob), "image/png");
+  });
+}
+
+async function endRushMode() {
   if (rushTimer) {
     clearInterval(rushTimer);
     rushTimer = null;
   }
 
   document.getElementById("rush-ready-modal").style.display = "none";
-  document.getElementById("lightboard-section").querySelector(".lightboard-tim").style.display = "none";
   rushIntroPlaying = false;
+
+  // Capture lightboard WITH Tim visible, before hiding him
+  if (currentShareBlobURL) {
+    URL.revokeObjectURL(currentShareBlobURL);
+    currentShareBlobURL = null;
+  }
+  currentShareBlob = null;
+  try {
+    currentShareBlob = await captureShareBlob();
+  } catch { /* ignore */ }
+
+  document.getElementById("lightboard-section").querySelector(".lightboard-tim").style.display = "none";
 
   const puzzlesSolvedEl = document.getElementById("puzzlesSolved");
   if (puzzlesSolvedEl) puzzlesSolvedEl.textContent = String(puzzlesSolved);
@@ -224,6 +287,15 @@ function hideModal() {
 
 function dismissRushModal() {
   hideModal();
+
+  // Clean up preview blob URL
+  const preview = document.getElementById("lightboard-preview");
+  if (preview) preview.style.display = "none";
+  if (currentShareBlobURL) {
+    URL.revokeObjectURL(currentShareBlobURL);
+    currentShareBlobURL = null;
+  }
+
   // Restore Tim to lightboard
   const timEl = document.querySelector("#lightboard-section .lightboard-tim");
   if (timEl) timEl.style.display = "";
@@ -614,7 +686,7 @@ function playWrongFillAnimation() {
   const allLanded = delays[count - 1] + INTRO_ANIM_MS + 320;
 
   for (let i = 0; i < count; i++) {
-    setTimeout(() => animateSnapAndPlace(shuffledItems[i], shuffledSlots[i], INTRO_ANIM_MS), delays[i]);
+    setTimeout(() => animateIntroTile(shuffledItems[i], shuffledSlots[i], INTRO_ANIM_MS), delays[i]);
   }
 
   // After all tiles land: cancel any snuck-through auto-check, show brief feedback, then reset
@@ -758,6 +830,79 @@ function makeVisualClone(el, className) {
   clone.style.webkitUserSelect = "none";
 
   return clone;
+}
+
+function animateIntroTile(el, slot, animMs) {
+  if (el.parentElement === slot) return;
+
+  el.dataset.animating = "1";
+
+  const rectFrom = el.getBoundingClientRect();
+  const rectTo   = slot.getBoundingClientRect();
+
+  const clone = makeVisualClone(el, "snap-clone");
+  clone.style.position     = "fixed";
+  clone.style.left         = `${rectFrom.left}px`;
+  clone.style.top          = `${rectFrom.top}px`;
+  clone.style.width        = `${rectFrom.width}px`;
+  clone.style.height       = `${rectFrom.height}px`;
+  clone.style.margin       = "0";
+  clone.style.zIndex       = "9999";
+  clone.style.pointerEvents = "none";
+  clone.style.transition   = "none";
+  clone.style.willChange   = "left, top";
+  document.body.appendChild(clone);
+  el.style.visibility = "hidden";
+
+const fromX = rectFrom.left + rectFrom.width  / 2;
+  const fromY = rectFrom.top  + rectFrom.height / 2;
+  const toX   = rectTo.left   + rectTo.width    / 2;
+  const toY   = rectTo.top    + rectTo.height   / 2;
+
+  const vx  = toX - fromX;
+  const vy  = toY - fromY;
+  const len = Math.sqrt(vx * vx + vy * vy) || 1;
+  const arcSign = Math.random() < 0.5 ? 1 : -1;
+  const arcAmt  = Math.min(len * 0.35, 90) * arcSign;
+  const cpX = (fromX + toX) / 2 + (-vy / len) * arcAmt;
+  const cpY = (fromY + toY) / 2 + ( vx / len) * arcAmt;
+
+  const halfW = rectFrom.width  / 2;
+  const halfH = rectFrom.height / 2;
+
+  const startTime = performance.now();
+
+  function easeInOut(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
+  function quad(t, p0, p1, p2) { const u = 1 - t; return u*u*p0 + 2*u*t*p1 + t*t*p2; }
+
+  function tick(now) {
+    const raw = Math.min((now - startTime) / animMs, 1);
+    const t   = easeInOut(raw);
+
+    clone.style.left = `${quad(t, fromX, cpX, toX) - halfW}px`;
+    clone.style.top  = `${quad(t, fromY, cpY, toY) - halfH}px`;
+
+if (raw < 1) { requestAnimationFrame(tick); } else { done(); }
+  }
+
+  requestAnimationFrame(tick);
+
+  function done() {
+    try { clone.remove(); } catch (_) {}
+
+    const bank     = document.getElementById("bank");
+    const existing = slot.querySelector(".bank-item");
+    if (existing && bank) bank.appendChild(existing);
+
+    slot.appendChild(el);
+    el.style.visibility = "";
+    el.classList.add("placed");
+    setTimeout(() => el.classList.remove("placed"), animMs + 40);
+
+    delete el.dataset.animating;
+    el.draggable = false;
+    updateControls();
+  }
 }
 
 function animateSnapAndPlace(el, slot, animMs = SNAP_ANIM_MS) {
@@ -1074,76 +1219,201 @@ function animatePointerCloneIntoSlot({ dragClone, originEl, slot }) {
 // HOME LIGHTBOARD
 // ============================================================================
 
-const HOME_LB_ITEMS = [
-  // top band — full width
-  { text: "e^(iπ) + 1 = 0", x:  2, y:  4, color: "#ff6ec7", glow: "rgba(255,110,199,0.5)" },
-  { text: "π ≈ 3.14159",     x: 60, y:  4, color: "#00d4ff", glow: "rgba(0,212,255,0.5)"   },
-  // second band — center + right (left reserved for graph ~x:10–24%)
-  { text: "E = mc²",         x: 36, y: 15, color: "#ffe033", glow: "rgba(255,224,51,0.5)"  },
-  { text: "√2 ≈ 1.414",      x: 64, y: 23, color: "#ff9d00", glow: "rgba(255,157,0,0.5)"   },
-  // third band
-  { text: "F = ma",          x: 27, y: 31, color: "#39ff14", glow: "rgba(57,255,20,0.5)"   },
-  { text: "Est. 1861",       x: 55, y: 37, color: "#c77dff", glow: "rgba(199,125,255,0.5)" },
-  // fourth band — just above Tim (top ≤ 41%)
-  { text: "∑ 1/n² = π²/6",  x: 27, y: 43, color: "#00d4ff", glow: "rgba(0,212,255,0.5)"   },
-  // bottom-left safe column (clear of Tim's centre)
-  { text: "Mens et Manus",   x:  2, y: 60, color: "#ff6ec7", glow: "rgba(255,110,199,0.5)" },
-  { text: "ℏω = E",          x:  2, y: 76, color: "#ffe033", glow: "rgba(255,224,51,0.5)"  },
+const HOME_LB_POOL = [
+  { text: "e^(iπ) + 1 = 0",      color: "#ff6ec7", glow: "rgba(255,110,199,0.5)" },
+  { text: "π ≈ 3.14159",          color: "#00d4ff", glow: "rgba(0,212,255,0.5)"   },
+  { text: "E = mc²",              color: "#ffe033", glow: "rgba(255,224,51,0.5)"  },
+  { text: "√2 ≈ 1.414",           color: "#ff9d00", glow: "rgba(255,157,0,0.5)"   },
+  { text: "F = ma",               color: "#39ff14", glow: "rgba(57,255,20,0.5)"   },
+  { text: "Est. 1861",            color: "#c77dff", glow: "rgba(199,125,255,0.5)" },
+  { text: "∑ 1/n² = π²/6",       color: "#00d4ff", glow: "rgba(0,212,255,0.5)"   },
+  { text: "Mens et Manus",        color: "#ff6ec7", glow: "rgba(255,110,199,0.5)" },
+  { text: "ℏω = E",               color: "#ffe033", glow: "rgba(255,224,51,0.5)"  },
+  { text: "∇²ψ = 0",              color: "#39ff14", glow: "rgba(57,255,20,0.5)"   },
+  { text: "PV = nRT",             color: "#ff9d00", glow: "rgba(255,157,0,0.5)"   },
+  { text: "i² = −1",              color: "#c77dff", glow: "rgba(199,125,255,0.5)" },
+  { text: "a² + b² = c²",        color: "#ff6ec7", glow: "rgba(255,110,199,0.5)" },
+  { text: "det(A) ≠ 0",          color: "#00d4ff", glow: "rgba(0,212,255,0.5)"   },
+  { text: "lim 1/n → 0",         color: "#ffe033", glow: "rgba(255,224,51,0.5)"  },
+  { text: "∫eˣ dx = eˣ + C",    color: "#39ff14", glow: "rgba(57,255,20,0.5)"   },
+  { text: "φ = (1+√5)/2",        color: "#ff9d00", glow: "rgba(255,157,0,0.5)"   },
+  { text: "H|ψ⟩ = E|ψ⟩",        color: "#c77dff", glow: "rgba(199,125,255,0.5)" },
+  { text: "Cambridge, MA",        color: "#ff6ec7", glow: "rgba(255,110,199,0.5)" },
+  { text: "n! ~ (n/e)ⁿ√(2πn)",  color: "#00d4ff", glow: "rgba(0,212,255,0.5)"   },
 ];
 
-let homeLbAnimId  = null;
-let homeLbStars   = [];
-let homeLbStar    = null;    // active shooting star
-let homeLbFw      = null;    // active firework
-let homeLbGearAng = 0;
+// Doodle pool — approximate half-extents in % of canvas for overlap detection
+const DOODLE_POOL = ['gear', 'sine', 'helix', 'matrix', 'atom', 'fibonacci', 'venn', 'triangle', 'star', 'numberLine'];
+const DOODLE_PCT  = {
+  gear:       { rw: 9,  rh: 10 },
+  sine:       { rw: 14, rh: 22 },
+  helix:      { rw: 10, rh: 22 },
+  matrix:     { rw: 17, rh: 13 },
+  atom:       { rw: 11, rh: 11 },
+  fibonacci:  { rw: 12, rh: 12 },
+  venn:       { rw: 16, rh: 10 },
+  triangle:   { rw: 10, rh: 10 },
+  star:       { rw:  7, rh:  7 },
+  numberLine: { rw: 17, rh:  6 },
+};
 
-// ── Stars ──────────────────────────────────────────────────────────────────
+let homeLbAnimId    = null;
+let homeLbMutateTimer = null;
+let homeLbStars     = [];
+let homeLbStar      = null;
+let homeLbFw        = null;
+let homeLbStartTs   = null;
+let homeLbCfg       = null;
+
+// ── Doodle params and placement ───────────────────────────────────────────────
+function homeLbBuildParams(type, w, h) {
+  switch (type) {
+    case 'gear':       return { r:  h*(0.060+Math.random()*0.035) };
+    case 'sine':       return { gw: w*(0.110+Math.random()*0.050), gh: h*(0.24+Math.random()*0.10) };
+    case 'helix':      return { gw: w*(0.080+Math.random()*0.040), gh: h*(0.24+Math.random()*0.12) };
+    case 'matrix':     return { cw: w*(0.048+Math.random()*0.018), ch: h*(0.10+Math.random()*0.04) };
+    case 'atom':       return { r:  h*(0.070+Math.random()*0.030) };
+    case 'fibonacci':  return { r:  h*(0.090+Math.random()*0.030) };
+    case 'venn':       return { r:  w*(0.055+Math.random()*0.020) };
+    case 'triangle':   return { size: h*(0.110+Math.random()*0.040) };
+    case 'star':       return { r:  h*(0.055+Math.random()*0.025) };
+    case 'numberLine': return { lw: w*(0.140+Math.random()*0.070) };
+    default: return {};
+  }
+}
+
+function homeLbBuildCfg(w, h) {
+  const types   = [...DOODLE_POOL].sort(() => Math.random() - 0.5).slice(0, 4 + Math.floor(Math.random() * 2));
+  const doodles = [];
+
+  for (const type of types) {
+    const sz = DOODLE_PCT[type];
+    let placed = false;
+
+    for (let attempt = 0; attempt < 80; attempt++) {
+      let pctX, pctY;
+      const zone = Math.random();
+      if (zone < 0.65) {
+        pctX = sz.rw + Math.random() * Math.max(1, 90 - sz.rw * 2);
+        pctY = sz.rh + Math.random() * Math.max(1, 44 - sz.rh * 2);
+      } else if (zone < 0.82) {
+        pctX = sz.rw + Math.random() * Math.max(1, 18 - sz.rw * 2);
+        pctY = 50 + sz.rh + Math.random() * Math.max(1, 38 - sz.rh * 2);
+      } else {
+        pctX = 80 + Math.random() * Math.max(1, 16 - sz.rw * 2);
+        pctY = 50 + sz.rh + Math.random() * Math.max(1, 38 - sz.rh * 2);
+      }
+
+      if (pctX > 22 && pctX < 78 && pctY > 46) continue;
+
+      const overlaps = doodles.some(d => {
+        const osz = DOODLE_PCT[d.type];
+        const dx  = (pctX - d.pctCX) / (sz.rw + osz.rw);
+        const dy  = (pctY - d.pctCY) / (sz.rh + osz.rh);
+        return dx * dx + dy * dy < 1;
+      });
+
+      if (!overlaps) {
+        doodles.push({ type, cx: pctX/100*w, cy: pctY/100*h, pctCX: pctX, pctCY: pctY,
+                       params: homeLbBuildParams(type, w, h), showMs: 0 });
+        placed = true;
+        break;
+      }
+    }
+
+    if (!placed) {
+      const pctX = sz.rw + Math.random() * Math.max(1, 90 - sz.rw * 2);
+      const pctY = sz.rh + Math.random() * Math.max(1, 40 - sz.rh * 2);
+      doodles.push({ type, cx: pctX/100*w, cy: pctY/100*h, pctCX: pctX, pctCY: pctY,
+                     params: homeLbBuildParams(type, w, h), showMs: 0 });
+    }
+  }
+
+  let t = 0;
+  doodles.forEach(d => { d.showMs = t; t += (3 + Math.random() * 4) * 1000; });
+  return { doodles };
+}
+
+// ── Text item position generator ──────────────────────────────────────────────
+function homeLbRandomPositions(count, reservedZones, alreadyPlaced = []) {
+  const placed   = [...alreadyPlaced]; // includes old items for conflict checking
+  const newItems = [];                 // only newly placed positions returned
+  const MIN_DIST  = 22;
+  const MAX_TRIES = 120;
+
+  function conflicts(x, y) {
+    if (x < 1 || x > 86 || y < 1 || y > 92) return true;
+    if (x > 22 && x < 78 && y > 46) return true;
+    // Check anchor + rightward offsets so text body doesn't overlap doodles
+    for (const tx of [x, x + 10, x + 20]) {
+      for (const z of reservedZones) {
+        const dx = (tx - z.cx) / z.rw, dy = (y - z.cy) / z.rh;
+        if (dx * dx + dy * dy < 1) return true;
+      }
+    }
+    // Check new item's body against existing items' left edges and right extents
+    for (const p of placed) {
+      for (const ox of [0, 20]) {
+        const dx = (x + ox) - p.x, dy = (y - p.y) * 1.6;
+        if (dx * dx + dy * dy < MIN_DIST * MIN_DIST) return true;
+      }
+    }
+    return false;
+  }
+
+  for (let i = 0; i < count; i++) {
+    let pos = null;
+    for (let a = 0; a < MAX_TRIES; a++) {
+      let x, y;
+      const r = Math.random();
+      if (r < 0.55) {
+        x = 2 + Math.random() * 80; y = 2 + Math.random() * 42;
+      } else if (r < 0.77) {
+        x = 2 + Math.random() * 17; y = 48 + Math.random() * 40;
+      } else {
+        x = 74 + Math.random() * 12; y = 48 + Math.random() * 40;
+      }
+      if (!conflicts(x, y)) { pos = { x, y }; break; }
+    }
+    if (pos) { placed.push(pos); newItems.push(pos); }
+    // No fallback — skip items that can't be cleanly placed
+  }
+  return newItems;
+}
+
+// ── Stars ─────────────────────────────────────────────────────────────────────
 function homeLbMakeStars(w, h) {
-  // Fixed fractional positions in safe zones (avoiding Tim's bottom-center 50%)
   const pts = [
     [0.05,0.08],[0.28,0.06],[0.50,0.15],[0.72,0.10],[0.92,0.08],
     [0.15,0.22],[0.45,0.28],[0.65,0.30],[0.85,0.24],[0.20,0.34],
-    [0.04,0.58],[0.10,0.76],[0.07,0.88],               // bottom-left
-    [0.88,0.60],[0.94,0.76],[0.91,0.88],[0.80,0.82],   // bottom-right
+    [0.04,0.58],[0.10,0.76],[0.07,0.88],
+    [0.88,0.60],[0.94,0.76],[0.91,0.88],[0.80,0.82],
   ];
   return pts.map(([px,py], i) => ({
-    x: px * w, y: py * h,
-    phase: (i / pts.length) * Math.PI * 2,
-    size: 1.5 + (i % 3) * 0.65,
+    x: px*w, y: py*h, phase: (i/pts.length)*Math.PI*2, size: 1.5+(i%3)*0.65,
   }));
 }
 
 function homeLbDrawStars(ctx, ts) {
   homeLbStars.forEach(s => {
-    const alpha = 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(ts * 0.0018 + s.phase));
-    const r     = s.size * (0.85 + 0.15 * Math.sin(ts * 0.003 + s.phase + 1));
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle   = "#fff";
-    ctx.shadowColor = "#ffe033";
-    ctx.shadowBlur  = 4;
+    const alpha = 0.25 + 0.75*(0.5 + 0.5*Math.sin(ts*0.0018 + s.phase));
+    const r     = s.size*(0.85 + 0.15*Math.sin(ts*0.003 + s.phase + 1));
+    ctx.save(); ctx.globalAlpha = alpha; ctx.fillStyle = "#fff";
+    ctx.shadowColor = "#ffe033"; ctx.shadowBlur = 4;
     ctx.beginPath();
     for (let i = 0; i < 8; i++) {
-      const a   = (i / 8) * Math.PI * 2;
-      const rad = i % 2 === 0 ? r : r * 0.35;
-      i === 0
-        ? ctx.moveTo(s.x + rad * Math.cos(a), s.y + rad * Math.sin(a))
-        : ctx.lineTo(s.x + rad * Math.cos(a), s.y + rad * Math.sin(a));
+      const a = (i/8)*Math.PI*2, rad = i%2===0 ? r : r*0.35;
+      i===0 ? ctx.moveTo(s.x+rad*Math.cos(a), s.y+rad*Math.sin(a))
+            : ctx.lineTo(s.x+rad*Math.cos(a), s.y+rad*Math.sin(a));
     }
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
+    ctx.closePath(); ctx.fill(); ctx.restore();
   });
 }
 
-// ── Shooting star ───────────────────────────────────────────────────────────
+// ── Shooting star ─────────────────────────────────────────────────────────────
 function homeLbNewStar(w, h) {
-  return {
-    x: w * (0.02 + Math.random() * 0.22),
-    y: h * (0.03 + Math.random() * 0.22),
-    vx: w * 0.00055, vy: h * 0.00018,
-    trail: [], start: null, dur: 2000,
-  };
+  return { x:w*(0.02+Math.random()*0.22), y:h*(0.03+Math.random()*0.22),
+           vx:w*0.00055, vy:h*0.00018, trail:[], start:null, dur:2000 };
 }
 
 function homeLbTickStar(ctx, s, ts) {
@@ -1151,31 +1421,28 @@ function homeLbTickStar(ctx, s, ts) {
   const t = (ts - s.start) / s.dur;
   if (t >= 1) return true;
   s.x += s.vx; s.y += s.vy;
-  s.trail.push({ x: s.x, y: s.y });
+  s.trail.push({ x:s.x, y:s.y });
   if (s.trail.length > 28) s.trail.shift();
-  const alpha = t < 0.12 ? t / 0.12 : t > 0.75 ? (1 - t) / 0.25 : 1;
+  const alpha = t < 0.12 ? t/0.12 : t > 0.75 ? (1-t)/0.25 : 1;
   s.trail.forEach((p, i) => {
-    const tf = i / s.trail.length;
-    ctx.save(); ctx.globalAlpha = alpha * tf * 0.55;
-    ctx.fillStyle = "#ffe033";
-    ctx.beginPath(); ctx.arc(p.x, p.y, tf * 2, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
+    const tf = i/s.trail.length;
+    ctx.save(); ctx.globalAlpha = alpha*tf*0.55; ctx.fillStyle = "#ffe033";
+    ctx.beginPath(); ctx.arc(p.x, p.y, tf*2, 0, Math.PI*2); ctx.fill(); ctx.restore();
   });
-  ctx.save(); ctx.globalAlpha = alpha;
-  ctx.fillStyle = "#fff"; ctx.shadowColor = "#ffe033"; ctx.shadowBlur = 10;
-  ctx.beginPath(); ctx.arc(s.x, s.y, 2.5, 0, Math.PI * 2); ctx.fill();
-  ctx.restore();
+  ctx.save(); ctx.globalAlpha = alpha; ctx.fillStyle = "#fff";
+  ctx.shadowColor = "#ffe033"; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(s.x, s.y, 2.5, 0, Math.PI*2); ctx.fill(); ctx.restore();
   return false;
 }
 
-// ── Firework ────────────────────────────────────────────────────────────────
+// ── Firework ──────────────────────────────────────────────────────────────────
 const FW_COLORS = ["#ff1423","#ff6ec7","#ffe033","#00d4ff","#c77dff","#39ff14","#ff9d00"];
 
 function homeLbNewFw(w, h) {
   const left = Math.random() > 0.5;
-  const sx = left ? w * 0.07 : w * 0.93;
-  const ex = sx + (left ? 1 : -1) * w * (0.04 + Math.random() * 0.10);
-  const ey = h * (0.10 + Math.random() * 0.28);
+  const sx = left ? w*0.07 : w*0.93;
+  const ex = sx + (left ? 1 : -1) * w * (0.04 + Math.random()*0.10);
+  const ey = h * (0.10 + Math.random()*0.28);
   return { phase:"launch", sx, x:sx, y:h, ex, ey, start:null, launchMs:900, explodeAt:null, particles:[] };
 }
 
@@ -1184,239 +1451,375 @@ function homeLbTickFw(ctx, fw, ts) {
   if (fw.phase === "launch") {
     const p = Math.min((ts - fw.start) / fw.launchMs, 1);
     fw.x = fw.sx + (fw.ex - fw.sx) * p;
-    fw.y = fw.y + (fw.ey - fw.y) * (p < 1 ? 0.08 : 1); // ease up
-    ctx.save(); ctx.globalAlpha = 0.9;
-    ctx.fillStyle = "#fff"; ctx.shadowColor = "#fff"; ctx.shadowBlur = 8;
-    ctx.beginPath(); ctx.arc(fw.x, fw.y, 2, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
+    fw.y = fw.y + (fw.ey - fw.y) * (p < 1 ? 0.08 : 1);
+    ctx.save(); ctx.globalAlpha = 0.9; ctx.fillStyle = "#fff";
+    ctx.shadowColor = "#fff"; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.arc(fw.x, fw.y, 2, 0, Math.PI*2); ctx.fill(); ctx.restore();
     if (p >= 1) {
-      fw.phase = "explode"; fw.explodeAt = ts;
-      fw.x = fw.ex; fw.y = fw.ey;
+      fw.phase = "explode"; fw.explodeAt = ts; fw.x = fw.ex; fw.y = fw.ey;
       for (let i = 0; i < 32; i++) {
-        const a   = (i / 32) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
-        const spd = 1 + Math.random() * 2.2;
-        fw.particles.push({
-          x: fw.x, y: fw.y,
-          vx: Math.cos(a) * spd, vy: Math.sin(a) * spd,
-          color: FW_COLORS[i % FW_COLORS.length],
-          r: 1.5 + Math.random() * 1.5,
-        });
+        const a = (i/32)*Math.PI*2 + (Math.random()-0.5)*0.4, spd = 1 + Math.random()*2.2;
+        fw.particles.push({ x:fw.x, y:fw.y, vx:Math.cos(a)*spd, vy:Math.sin(a)*spd,
+                            color:FW_COLORS[i%FW_COLORS.length], r:1.5+Math.random()*1.5 });
       }
     }
   } else {
-    const elapsed = ts - fw.explodeAt, dur = 2300, p = elapsed / dur;
+    const p = (ts - fw.explodeAt) / 2300;
     if (p >= 1) return true;
     fw.particles.forEach(pt => {
       pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.05;
-      ctx.save(); ctx.globalAlpha = 1 - p;
-      ctx.fillStyle = pt.color; ctx.shadowColor = pt.color; ctx.shadowBlur = 5;
-      ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.r * (1 - p * 0.5), 0, Math.PI * 2);
+      ctx.save(); ctx.globalAlpha = 1-p; ctx.fillStyle = pt.color;
+      ctx.shadowColor = pt.color; ctx.shadowBlur = 5;
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.r*(1-p*0.5), 0, Math.PI*2);
       ctx.fill(); ctx.restore();
     });
   }
   return false;
 }
 
-// ── Sine-wave graph ─────────────────────────────────────────────────────────
-function homeLbDrawGraph(ctx, cx, cy, gw, gh, ts) {
-  ctx.save();
+// ── Doodle draw functions ─────────────────────────────────────────────────────
 
-  // Axes
-  ctx.globalAlpha = 0.55;
-  ctx.strokeStyle = "#39ff14";
-  ctx.lineWidth   = 1.3;
-  ctx.shadowColor = "#39ff14";
-  ctx.shadowBlur  = 5;
-
-  // x-axis
-  ctx.beginPath();
-  ctx.moveTo(cx - gw / 2, cy);
-  ctx.lineTo(cx + gw / 2, cy);
-  ctx.stroke();
-
-  // y-axis
-  ctx.beginPath();
-  ctx.moveTo(cx, cy - gh / 2);
-  ctx.lineTo(cx, cy + gh / 2);
-  ctx.stroke();
-
-  // Arrow tips
-  const ar = 5;
-  ctx.beginPath();
-  ctx.moveTo(cx + gw / 2, cy);
-  ctx.lineTo(cx + gw / 2 - ar, cy - 3);
-  ctx.moveTo(cx + gw / 2, cy);
-  ctx.lineTo(cx + gw / 2 - ar, cy + 3);
-  ctx.moveTo(cx, cy - gh / 2);
-  ctx.lineTo(cx - 3, cy - gh / 2 + ar);
-  ctx.moveTo(cx, cy - gh / 2);
-  ctx.lineTo(cx + 3, cy - gh / 2 + ar);
-  ctx.stroke();
-
-  // Scrolling sine wave
-  const phase = ts * 0.001;
-  ctx.globalAlpha = 0.9;
-  ctx.strokeStyle = "#ff6ec7";
-  ctx.lineWidth   = 2;
-  ctx.shadowColor = "#ff6ec7";
-  ctx.shadowBlur  = 7;
-  ctx.beginPath();
-  const segs = 80;
-  for (let i = 0; i <= segs; i++) {
-    const t = i / segs;
-    const x = cx - gw / 2 + 4 + t * (gw - 8);
-    const y = cy - (gh / 2 - 7) * Math.sin(t * Math.PI * 2 + phase);
-    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-  }
-  ctx.stroke();
-
-  // Axis tick marks
-  ctx.globalAlpha = 0.35;
-  ctx.strokeStyle = "#39ff14";
-  ctx.lineWidth   = 1;
-  ctx.shadowBlur  = 0;
-  [0.25, 0.5, 0.75].forEach(f => {
-    const xp = cx - gw / 2 + f * gw;
-    ctx.beginPath(); ctx.moveTo(xp, cy - 3); ctx.lineTo(xp, cy + 3); ctx.stroke();
-  });
-  [-0.35, 0.35].forEach(f => {
-    const yp = cy + f * gh;
-    ctx.beginPath(); ctx.moveTo(cx - 3, yp); ctx.lineTo(cx + 3, yp); ctx.stroke();
-  });
-
-  ctx.restore();
-}
-
-// ── Matrix ───────────────────────────────────────────────────────────────────
-function homeLbDrawMatrix(ctx, cx, cy, cellW, cellH) {
-  const vals = [[2, -1, 0], [-1, 2, -1], [0, -1, 2]];
-  const cols = vals[0].length, rows = vals.length;
-  const mw = cellW * cols, mh = cellH * rows;
-  const left = cx - mw / 2, top = cy - mh / 2;
-
-  ctx.save();
-  ctx.globalAlpha = 0.78;
-  ctx.fillStyle   = "#c77dff";
-  ctx.shadowColor = "#c77dff";
-  ctx.shadowBlur  = 8;
-  ctx.font        = `600 ${Math.round(cellH * 0.72)}px 'Caveat', cursive`;
-  ctx.textAlign   = "center";
-  ctx.textBaseline = "middle";
-
-  vals.forEach((row, r) =>
-    row.forEach((v, c) =>
-      ctx.fillText(v, left + c * cellW + cellW / 2, top + r * cellH + cellH / 2)
-    )
-  );
-
-  // Square brackets
-  ctx.strokeStyle = "#c77dff";
-  ctx.lineWidth   = 2;
-  ctx.shadowBlur  = 6;
-  const bw = 7, pad = 4;
-  [[left - pad, left - pad + bw], [left + mw + pad - bw, left + mw + pad]].forEach(([x0, x1]) => {
-    const isLeft = x1 < cx;
-    ctx.beginPath();
-    ctx.moveTo(isLeft ? x1 : x0, top - pad);
-    ctx.lineTo(isLeft ? x0 : x1, top - pad);
-    ctx.lineTo(isLeft ? x0 : x1, top + mh + pad);
-    ctx.lineTo(isLeft ? x1 : x0, top + mh + pad);
-    ctx.stroke();
-  });
-
-  ctx.restore();
-}
-
-// ── Gear ────────────────────────────────────────────────────────────────────
-function homeLbDrawGear(ctx, cx, cy, r, angle) {
-  const teeth = 8, inner = r * 0.68, tooth = r * 0.38, hole = r * 0.28;
+function doodleGear(ctx, cx, cy, r, ts, fade) {
+  const teeth=8, inner=r*0.68, tooth=r*0.38, hole=r*0.28, angle=ts*0.0004;
   ctx.save();
   ctx.translate(cx, cy); ctx.rotate(angle);
-  ctx.globalAlpha = 0.45;
-  ctx.strokeStyle = "#c77dff"; ctx.fillStyle = "rgba(199,125,255,0.12)";
-  ctx.lineWidth = 1.5; ctx.shadowColor = "#c77dff"; ctx.shadowBlur = 7;
+  ctx.globalAlpha = 0.45*fade; ctx.strokeStyle = "#c77dff";
+  ctx.fillStyle = "rgba(199,125,255,0.12)"; ctx.lineWidth = 1.5;
+  ctx.shadowColor = "#c77dff"; ctx.shadowBlur = 7;
   ctx.beginPath();
   for (let i = 0; i < teeth; i++) {
-    const a1 = (i / teeth) * Math.PI * 2,        a2 = ((i + 0.4) / teeth) * Math.PI * 2,
-          a3 = ((i + 0.6) / teeth) * Math.PI * 2, a4 = ((i + 1)   / teeth) * Math.PI * 2;
-    ctx.lineTo(Math.cos(a1) * inner,        Math.sin(a1) * inner);
-    ctx.lineTo(Math.cos(a2) * (inner+tooth), Math.sin(a2) * (inner+tooth));
-    ctx.lineTo(Math.cos(a3) * (inner+tooth), Math.sin(a3) * (inner+tooth));
-    ctx.lineTo(Math.cos(a4) * inner,        Math.sin(a4) * inner);
+    const a1=(i/teeth)*Math.PI*2,        a2=((i+0.4)/teeth)*Math.PI*2,
+          a3=((i+0.6)/teeth)*Math.PI*2,  a4=((i+1)/teeth)*Math.PI*2;
+    ctx.lineTo(Math.cos(a1)*inner,         Math.sin(a1)*inner);
+    ctx.lineTo(Math.cos(a2)*(inner+tooth), Math.sin(a2)*(inner+tooth));
+    ctx.lineTo(Math.cos(a3)*(inner+tooth), Math.sin(a3)*(inner+tooth));
+    ctx.lineTo(Math.cos(a4)*inner,         Math.sin(a4)*inner);
   }
   ctx.closePath(); ctx.fill(); ctx.stroke();
-  ctx.beginPath(); ctx.arc(0, 0, hole, 0, Math.PI * 2);
-  ctx.globalAlpha = 0.7; ctx.stroke();
+  ctx.beginPath(); ctx.arc(0, 0, hole, 0, Math.PI*2);
+  ctx.globalAlpha = 0.7*fade; ctx.stroke();
   ctx.restore();
 }
 
-// ── Orchestration ───────────────────────────────────────────────────────────
+function doodleSineGraph(ctx, cx, cy, gw, gh, ts, fade) {
+  ctx.save();
+  ctx.globalAlpha = 0.55*fade; ctx.strokeStyle = "#39ff14";
+  ctx.lineWidth = 1.3; ctx.shadowColor = "#39ff14"; ctx.shadowBlur = 5;
+  ctx.beginPath(); ctx.moveTo(cx-gw/2, cy); ctx.lineTo(cx+gw/2, cy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx, cy-gh/2); ctx.lineTo(cx, cy+gh/2); ctx.stroke();
+  const ar = 5; ctx.beginPath();
+  ctx.moveTo(cx+gw/2,cy); ctx.lineTo(cx+gw/2-ar,cy-3);
+  ctx.moveTo(cx+gw/2,cy); ctx.lineTo(cx+gw/2-ar,cy+3);
+  ctx.moveTo(cx,cy-gh/2); ctx.lineTo(cx-3,cy-gh/2+ar);
+  ctx.moveTo(cx,cy-gh/2); ctx.lineTo(cx+3,cy-gh/2+ar); ctx.stroke();
+  ctx.globalAlpha = 0.9*fade; ctx.strokeStyle = "#ff6ec7";
+  ctx.lineWidth = 2; ctx.shadowColor = "#ff6ec7"; ctx.shadowBlur = 7;
+  ctx.beginPath();
+  for (let i = 0; i <= 80; i++) {
+    const t=i/80, x=cx-gw/2+4+t*(gw-8), y=cy-(gh/2-7)*Math.sin(t*Math.PI*2+ts*0.001);
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.globalAlpha = 0.35*fade; ctx.strokeStyle = "#39ff14"; ctx.lineWidth = 1; ctx.shadowBlur = 0;
+  [0.25,0.5,0.75].forEach(f => {
+    const xp = cx-gw/2+f*gw;
+    ctx.beginPath(); ctx.moveTo(xp,cy-3); ctx.lineTo(xp,cy+3); ctx.stroke();
+  });
+  ctx.restore();
+}
+
+function doodleHelix(ctx, cx, cy, gw, gh, ts, fade) {
+  const turns = 3.5, top = cy - gh/2, totalT = turns * Math.PI * 2;
+  const segs  = turns * 36 | 0;
+  const animOff = ts * 0.00025; // slow rotation
+  ctx.save();
+  // vertical axis
+  ctx.globalAlpha = 0.35*fade; ctx.strokeStyle = "#00d4ff";
+  ctx.lineWidth = 1; ctx.shadowColor = "#00d4ff"; ctx.shadowBlur = 3;
+  ctx.beginPath(); ctx.moveTo(cx, top-4); ctx.lineTo(cx, top+gh+4); ctx.stroke();
+  // draw each segment with smoothly-varying depth: back=dim/dashed, front=bright/solid
+  ctx.strokeStyle = "#00d4ff"; ctx.shadowColor = "#00d4ff";
+  for (let i = 0; i < segs; i++) {
+    const t1 = (i/segs)*totalT,     t2 = ((i+1)/segs)*totalT;
+    const cos1 = Math.cos(t1+animOff), cos2 = Math.cos(t2+animOff);
+    const depth = ((cos1+cos2)*0.5 + 1) * 0.5; // 0=fully back, 1=fully front
+    ctx.globalAlpha = (0.15 + depth*0.75) * fade;
+    ctx.lineWidth   = 0.8 + depth*1.5;
+    ctx.shadowBlur  = 2 + depth*7;
+    ctx.setLineDash(depth < 0.3 ? [2,3] : []);
+    ctx.beginPath();
+    ctx.moveTo(cx+(gw/2)*cos1, top+(t1/totalT)*gh);
+    ctx.lineTo(cx+(gw/2)*cos2, top+(t2/totalT)*gh);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+function doodleMatrix(ctx, cx, cy, cw, ch, fade) {
+  const vals=[[2,-1,0],[-1,2,-1],[0,-1,2]];
+  const mw=cw*3, mh=ch*3, left=cx-mw/2, top=cy-mh/2;
+  ctx.save();
+  ctx.globalAlpha = 0.78*fade; ctx.fillStyle = "#c77dff";
+  ctx.shadowColor = "#c77dff"; ctx.shadowBlur = 8;
+  ctx.font = `600 ${Math.round(ch*0.72)}px 'Caveat', cursive`;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  vals.forEach((row,r) => row.forEach((v,c) =>
+    ctx.fillText(v, left+c*cw+cw/2, top+r*ch+ch/2)
+  ));
+  ctx.strokeStyle = "#c77dff"; ctx.lineWidth = 2; ctx.shadowBlur = 6;
+  const bw=7, pad=4;
+  [[left-pad, left-pad+bw],[left+mw+pad-bw, left+mw+pad]].forEach(([x0,x1]) => {
+    const isLeft = x1 < cx;
+    ctx.beginPath();
+    ctx.moveTo(isLeft?x1:x0, top-pad); ctx.lineTo(isLeft?x0:x1, top-pad);
+    ctx.lineTo(isLeft?x0:x1, top+mh+pad); ctx.lineTo(isLeft?x1:x0, top+mh+pad);
+    ctx.stroke();
+  });
+  ctx.restore();
+}
+
+function doodleAtom(ctx, cx, cy, r, ts, fade) {
+  ctx.save();
+  ctx.globalAlpha = 0.85*fade; ctx.fillStyle = "#ffe033";
+  ctx.shadowColor = "#ffe033"; ctx.shadowBlur = 12;
+  ctx.beginPath(); ctx.arc(cx, cy, r*0.16, 0, Math.PI*2); ctx.fill();
+  [0, Math.PI/3, -Math.PI/3].forEach((tilt, idx) => {
+    ctx.save();
+    ctx.translate(cx, cy); ctx.rotate(tilt);
+    ctx.globalAlpha = 0.30*fade; ctx.strokeStyle = "#ffe033";
+    ctx.lineWidth = 1; ctx.shadowColor = "#ffe033"; ctx.shadowBlur = 3;
+    ctx.beginPath(); ctx.ellipse(0, 0, r, r*0.32, 0, 0, Math.PI*2); ctx.stroke();
+    const ea = ts*0.0015 + idx*(Math.PI*2/3);
+    ctx.globalAlpha = 0.9*fade; ctx.fillStyle = "#ff6ec7";
+    ctx.shadowColor = "#ff6ec7"; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.arc(r*Math.cos(ea), r*0.32*Math.sin(ea), r*0.09, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  });
+  ctx.restore();
+}
+
+function doodleFibonacci(ctx, cx, cy, r, fade) {
+  ctx.save();
+  ctx.globalAlpha = 0.65*fade; ctx.strokeStyle = "#ff9d00";
+  ctx.lineWidth = 1.5; ctx.shadowColor = "#ff9d00"; ctx.shadowBlur = 6;
+  ctx.beginPath();
+  const b=0.25, a=r*0.05;
+  for (let i = 0; i <= 320; i++) {
+    const theta = (i/320)*Math.PI*4, rad = a*Math.exp(b*theta);
+    if (rad > r) break;
+    i===0 ? ctx.moveTo(cx+rad*Math.cos(theta), cy+rad*Math.sin(theta))
+          : ctx.lineTo(cx+rad*Math.cos(theta), cy+rad*Math.sin(theta));
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function doodleVenn(ctx, cx, cy, r, fade) {
+  ctx.save();
+  const off=r*0.55, color="#ff6ec7";
+  ctx.globalAlpha = 0.18*fade; ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(cx-off*0.5, cy, r, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx+off*0.5, cy, r, 0, Math.PI*2); ctx.fill();
+  ctx.globalAlpha = 0.55*fade; ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5; ctx.shadowColor = color; ctx.shadowBlur = 6;
+  ctx.beginPath(); ctx.arc(cx-off*0.5, cy, r, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx+off*0.5, cy, r, 0, Math.PI*2); ctx.stroke();
+  ctx.restore();
+}
+
+function doodleTriangle(ctx, cx, cy, size, fade) {
+  ctx.save();
+  const h=size*0.5, color="#ffe033";
+  const pts = [[cx-h, cy+h], [cx+h, cy+h], [cx-h, cy-h]];
+  ctx.globalAlpha = 0.7*fade; ctx.strokeStyle = color;
+  ctx.lineWidth = 1.8; ctx.shadowColor = color; ctx.shadowBlur = 7;
+  ctx.beginPath(); ctx.moveTo(...pts[0]); ctx.lineTo(...pts[1]); ctx.lineTo(...pts[2]); ctx.closePath(); ctx.stroke();
+  const sq=size*0.12, [bx,by]=pts[0];
+  ctx.globalAlpha = 0.5*fade; ctx.lineWidth = 1.2; ctx.shadowBlur = 4;
+  ctx.beginPath(); ctx.moveTo(bx+sq,by); ctx.lineTo(bx+sq,by-sq); ctx.lineTo(bx,by-sq); ctx.stroke();
+  ctx.globalAlpha = 0.45*fade; ctx.lineWidth = 1; ctx.shadowBlur = 3;
+  ctx.beginPath(); ctx.arc(pts[1][0], pts[1][1], size*0.18, Math.PI, Math.PI+Math.PI/4); ctx.stroke();
+  ctx.restore();
+}
+
+function doodleStar(ctx, cx, cy, r, fade) {
+  ctx.save();
+  ctx.globalAlpha = 0.55*fade; ctx.strokeStyle = "#ffe033";
+  ctx.lineWidth = 1.5; ctx.shadowColor = "#ffe033"; ctx.shadowBlur = 8;
+  ctx.fillStyle = "rgba(255,224,51,0.08)";
+  const inner = r*0.38;
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a=(i/10)*Math.PI*2 - Math.PI/2, rad=i%2===0?r:inner;
+    i===0 ? ctx.moveTo(cx+rad*Math.cos(a), cy+rad*Math.sin(a))
+          : ctx.lineTo(cx+rad*Math.cos(a), cy+rad*Math.sin(a));
+  }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+
+function doodleNumberLine(ctx, cx, cy, lw, fade) {
+  ctx.save();
+  const color = "#c77dff";
+  ctx.globalAlpha = 0.6*fade; ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5; ctx.shadowColor = color; ctx.shadowBlur = 5;
+  ctx.beginPath(); ctx.moveTo(cx-lw/2, cy); ctx.lineTo(cx+lw/2, cy); ctx.stroke();
+  const ar=5; ctx.beginPath();
+  ctx.moveTo(cx+lw/2,cy); ctx.lineTo(cx+lw/2-ar,cy-3);
+  ctx.moveTo(cx+lw/2,cy); ctx.lineTo(cx+lw/2-ar,cy+3);
+  ctx.moveTo(cx-lw/2,cy); ctx.lineTo(cx-lw/2+ar,cy-3);
+  ctx.moveTo(cx-lw/2,cy); ctx.lineTo(cx-lw/2+ar,cy+3);
+  ctx.stroke();
+  ctx.globalAlpha = 0.5*fade; ctx.lineWidth = 1; ctx.shadowBlur = 3;
+  ctx.fillStyle = color; ctx.font = `600 10px 'Caveat', cursive`;
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  for (let v = -2; v <= 2; v++) {
+    const x = cx + v*(lw/4);
+    ctx.beginPath(); ctx.moveTo(x, cy-(v===0?7:5)); ctx.lineTo(x, cy+(v===0?7:5)); ctx.stroke();
+    ctx.fillText(String(v), x, cy+8);
+  }
+  ctx.restore();
+}
+
+function drawDoodle(ctx, d, ts, fade) {
+  const p = d.params;
+  switch (d.type) {
+    case 'gear':       doodleGear(ctx, d.cx, d.cy, p.r, ts, fade);              break;
+    case 'sine':       doodleSineGraph(ctx, d.cx, d.cy, p.gw, p.gh, ts, fade); break;
+    case 'helix':      doodleHelix(ctx, d.cx, d.cy, p.gw, p.gh, ts, fade);     break;
+    case 'matrix':     doodleMatrix(ctx, d.cx, d.cy, p.cw, p.ch, fade);        break;
+    case 'atom':       doodleAtom(ctx, d.cx, d.cy, p.r, ts, fade);             break;
+    case 'fibonacci':  doodleFibonacci(ctx, d.cx, d.cy, p.r, fade);            break;
+    case 'venn':       doodleVenn(ctx, d.cx, d.cy, p.r, fade);                 break;
+    case 'triangle':   doodleTriangle(ctx, d.cx, d.cy, p.size, fade);          break;
+    case 'star':       doodleStar(ctx, d.cx, d.cy, p.r, fade);                 break;
+    case 'numberLine': doodleNumberLine(ctx, d.cx, d.cy, p.lw, fade);          break;
+  }
+}
+
+// ── Orchestration ─────────────────────────────────────────────────────────────
 function showHomeLightboard() {
   const sec = document.getElementById("home-lightboard-section");
   if (sec) sec.style.display = "";
 
-  // Repopulate every visit so the write-in animation replays fresh each time
-  const surface = document.getElementById("home-lb-surface");
-  if (surface) {
-    surface.innerHTML = "";
-    HOME_LB_ITEMS.forEach((item, i) => {
-      const el = document.createElement("div");
-      el.className = "home-lb-item";
-      el.textContent = item.text;
-      el.style.left           = item.x + "%";
-      el.style.top            = item.y + "%";
-      el.style.color          = item.color;
-      el.style.textShadow     = `0 0 8px ${item.glow}, 0 0 18px ${item.glow}`;
-      el.style.animationDelay = (i * 0.9) + "s";  // one at a time
-      surface.appendChild(el);
-    });
-  }
+  if (homeLbAnimId) { cancelAnimationFrame(homeLbAnimId); homeLbAnimId = null; }
+  if (homeLbMutateTimer) { clearTimeout(homeLbMutateTimer); homeLbMutateTimer = null; }
+  homeLbStar = null; homeLbFw = null; homeLbStars = []; homeLbStartTs = null;
 
   const canvas = document.getElementById("home-lb-canvas");
   const lb     = document.getElementById("home-lightboard");
-  if (!canvas || !lb || homeLbAnimId) return;
+  if (!canvas || !lb) return;
 
   canvas.width  = lb.offsetWidth  || 640;
   canvas.height = lb.offsetHeight || 300;
-  if (!homeLbStars.length) homeLbStars = homeLbMakeStars(canvas.width, canvas.height);
-
   const w = canvas.width, h = canvas.height;
-  // Static positions for permanent canvas elements
-  const gearX   = w * 0.925, gearY  = h * 0.14,  gearR  = h * 0.075;
-  const graphCX = w * 0.17,  graphCY = h * 0.34,  graphW = w * 0.13, graphH = h * 0.30;
-  const matCX   = w * 0.83,  matCY  = h * 0.70,  matCW  = w * 0.055, matCH = h * 0.115;
-  let starNext = Infinity, fwNext = Infinity, initialized = false;
+
+  homeLbCfg = homeLbBuildCfg(w, h);
+  const cfg = homeLbCfg;
+
+  const doodleReserved = () => cfg.doodles.map(d => {
+    const sz = DOODLE_PCT[d.type];
+    return { cx: d.pctCX, cy: d.pctCY, rw: sz.rw * 1.4, rh: sz.rh * 1.4 };
+  });
+
+  const poolOrder = HOME_LB_POOL.map((_, i) => i).sort(() => Math.random() - 0.5);
+  const count     = 9 + Math.floor(Math.random() * 4);
+  const positions = homeLbRandomPositions(count, doodleReserved());
+  const actual    = positions.length;
+  const selIdx    = poolOrder.slice(0, actual);
+  const selected  = selIdx.map(i => HOME_LB_POOL[i]);
+
+  // Unified shuffled timeline for text + doodles
+  const textEntries   = selected.map((item, i) => ({ kind: "text", item, pos: positions[i], delay: 0, poolIdx: selIdx[i] }));
+  const doodleEntries = cfg.doodles.map(d => ({ kind: "doodle", d }));
+  const allEntries    = [...textEntries, ...doodleEntries].sort(() => Math.random() - 0.5);
+  let t = 1 + Math.random() * 2;
+  allEntries.forEach(entry => {
+    if (entry.kind === "text") { entry.delay = t; }
+    else                       { entry.d.showMs = t * 1000; }
+    t += 3 + Math.random() * 4;
+  });
+
+  const surface = document.getElementById("home-lb-surface");
+  if (!surface) return;
+  surface.innerHTML = "";
+
+  // Active item tracking for mutation
+  const activeItems = [];
+  const usedPool    = new Set(selIdx);
+
+  function makeTextEl(item, pos, delaySec) {
+    const el = document.createElement("div");
+    el.className    = "home-lb-item";
+    el.textContent  = item.text + " ";
+    el.style.left   = pos.x.toFixed(1) + "%";
+    el.style.top    = pos.y.toFixed(1) + "%";
+    el.style.color  = item.color;
+    el.style.textShadow = `0 0 8px ${item.glow}, 0 0 18px ${item.glow}`;
+    el.style.animationDelay = delaySec.toFixed(2) + "s";
+    return el;
+  }
+
+  textEntries.forEach(({ item, pos, delay, poolIdx }) => {
+    const el = makeTextEl(item, pos, delay);
+    surface.appendChild(el);
+    activeItems.push({ item, pos, el, poolIdx });
+  });
+
+  // ── Mutation: continuously add/remove text items ──────────────────────────
+  function addItem() {
+    const available = HOME_LB_POOL.map((_, i) => i).filter(i => !usedPool.has(i));
+    if (!available.length) return;
+    const poolIdx = available[Math.floor(Math.random() * available.length)];
+    const item    = HOME_LB_POOL[poolIdx];
+    const spots   = homeLbRandomPositions(1, doodleReserved(), activeItems.map(a => a.pos));
+    if (!spots.length) return;
+    const pos = spots[0];
+    const el  = makeTextEl(item, pos, 0);
+    surface.appendChild(el);
+    activeItems.push({ item, pos, el, poolIdx });
+    usedPool.add(poolIdx);
+  }
+
+  function removeItem() {
+    if (activeItems.length <= 4) return;
+    const idx = Math.floor(Math.random() * activeItems.length);
+    const { el, poolIdx } = activeItems.splice(idx, 1)[0];
+    usedPool.delete(poolIdx);
+    el.style.transition = "opacity 1.8s ease";
+    el.style.opacity    = "0";
+    setTimeout(() => el.remove(), 1800);
+  }
+
+  function scheduleMutation() {
+    homeLbMutateTimer = setTimeout(() => {
+      if (Math.random() < 0.6 || activeItems.length < 5) addItem();
+      else removeItem();
+      scheduleMutation();
+    }, 6000 + Math.random() * 9000);
+  }
+  scheduleMutation();
+
+  // ── Animation frame ───────────────────────────────────────────────────────
+  let fwNext = Infinity;
 
   function frame(ts) {
     homeLbAnimId = requestAnimationFrame(frame);
-    if (!initialized) {
-      initialized = true;
-      starNext = ts + 1800;
-      fwNext   = ts + 4500;
-    }
-
+    if (!homeLbStartTs) { homeLbStartTs = ts; fwNext = ts + 4500; }
+    const elapsed = ts - homeLbStartTs;
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, w, h);
 
-    homeLbDrawStars(ctx, ts);
-    homeLbDrawGraph(ctx, graphCX, graphCY, graphW, graphH, ts);
-    homeLbDrawMatrix(ctx, matCX, matCY, matCW, matCH);
+    cfg.doodles.forEach(d => {
+      const fade = Math.min(1, Math.max(0, (elapsed - d.showMs) / 2500));
+      if (fade > 0) drawDoodle(ctx, d, ts, fade);
+    });
 
-    if (!homeLbStar && ts >= starNext) {
-      homeLbStar = homeLbNewStar(w, h);
-      starNext   = ts + 7000 + Math.random() * 4000;
-    }
-    if (homeLbStar && homeLbTickStar(ctx, homeLbStar, ts)) homeLbStar = null;
-
-    if (!homeLbFw && ts >= fwNext) {
-      homeLbFw = homeLbNewFw(w, h);
-      fwNext   = ts + 9000 + Math.random() * 5000;
-    }
+    if (!homeLbFw && ts >= fwNext) { homeLbFw = homeLbNewFw(w, h); fwNext = ts + 9000 + Math.random() * 5000; }
     if (homeLbFw && homeLbTickFw(ctx, homeLbFw, ts)) homeLbFw = null;
-
-    homeLbGearAng += 0.006;
-    homeLbDrawGear(ctx, gearX, gearY, gearR, homeLbGearAng);
   }
+
   homeLbAnimId = requestAnimationFrame(frame);
 }
 
@@ -1424,6 +1827,7 @@ function hideHomeLightboard() {
   const sec = document.getElementById("home-lightboard-section");
   if (sec) sec.style.display = "none";
   if (homeLbAnimId) { cancelAnimationFrame(homeLbAnimId); homeLbAnimId = null; }
+  if (homeLbMutateTimer) { clearTimeout(homeLbMutateTimer); homeLbMutateTimer = null; }
   homeLbStar = null;
   homeLbFw   = null;
 }
@@ -1507,94 +1911,30 @@ document.addEventListener("DOMContentLoaded", () => {
     modalCloseBtn.addEventListener("click", dismissRushModal);
   }
 
-  // Share / download lightboard (icon excluded from capture via ignoreElements)
+  // Share / download lightboard
   const shareBtn = document.getElementById("shareBtn");
   if (shareBtn) {
     shareBtn.addEventListener("click", async () => {
-      const board = document.getElementById("lightboard");
-      if (!board || typeof html2canvas === "undefined") return;
-
       shareBtn.disabled = true;
-
       try {
-        const scale = 2;
-        const boardRect = board.getBoundingClientRect();
-        const w = Math.round(boardRect.width * scale);
-        const h = Math.round(boardRect.height * scale);
+        const blob = currentShareBlob || await captureShareBlob();
+        if (!blob) { shareBtn.disabled = false; return; }
 
-        // Composite manually so the Tim SVG img renders correctly —
-        // html2canvas struggles with SVG <img> elements but native drawImage handles them fine.
-        const out = document.createElement("canvas");
-        out.width = w;
-        out.height = h;
-        const ctx = out.getContext("2d");
-
-        ctx.fillStyle = "#07071a";
-        ctx.fillRect(0, 0, w, h);
-
-        const timImg = board.querySelector(".lightboard-tim");
-        if (timImg && timImg.complete) {
-          const tr = timImg.getBoundingClientRect();
-          ctx.globalAlpha = 0.62;
-          ctx.filter = "brightness(0.9) saturate(0.85)";
-          ctx.drawImage(
-            timImg,
-            (tr.left - boardRect.left) * scale,
-            (tr.top  - boardRect.top)  * scale,
-            tr.width  * scale,
-            tr.height * scale
-          );
-          ctx.filter = "none";
-          ctx.globalAlpha = 1;
+        const file = new File([blob], "arithmix-lightboard.png", { type: "image/png" });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          navigator.share({
+            text: `Play ARITHMIX! ${GAME_URL}`,
+            files: [file],
+          }).catch(() => {});
+        } else {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "arithmix-lightboard.png";
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 10000);
         }
-
-        const surface = document.getElementById("lightboard-surface");
-        const eqCanvas = await html2canvas(surface, {
-          useCORS: true,
-          scale,
-          backgroundColor: null,
-        });
-        ctx.drawImage(eqCanvas, 0, 0);
-
-        // Footer strip with "Play ARITHMIX!" link text
-        const GAME_URL = "https://mynumbers.onrender.com/static/game.html";
-        const footerH = 36 * scale;
-        const fullH = h + footerH;
-        const final = document.createElement("canvas");
-        final.width = w;
-        final.height = fullH;
-        const fc = final.getContext("2d");
-        fc.drawImage(out, 0, 0);
-        fc.fillStyle = "#07071a";
-        fc.fillRect(0, h, w, footerH);
-        fc.fillStyle = "#1e1e36";
-        fc.fillRect(0, h, w, 2 * scale);
-        fc.font = `${13 * scale}px 'Caveat', cursive`;
-        fc.textAlign = "center";
-        fc.textBaseline = "middle";
-        fc.fillStyle = "#00d4ff";
-        fc.fillText("Play ARITHMIX!  →  " + GAME_URL, w / 2, h + footerH / 2);
-
-        final.toBlob((blob) => {
-          shareBtn.disabled = false;
-          const file = new File([blob], "arithmix-lightboard.png", { type: "image/png" });
-
-          if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            navigator.share({
-              title: "ARITHMIX Lightboard",
-              text: "Play ARITHMIX!",
-              url: GAME_URL,
-              files: [file],
-            }).catch(() => {});
-          } else {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "arithmix-lightboard.png";
-            a.click();
-            setTimeout(() => URL.revokeObjectURL(url), 10000);
-          }
-        }, "image/png");  // final.toBlob
+        shareBtn.disabled = false;
       } catch {
         shareBtn.disabled = false;
       }
