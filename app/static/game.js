@@ -713,7 +713,7 @@ function addEquationToLightboard(expr) {
 
   const el = document.createElement("div");
   el.className = "lightboard-eq";
-  el.textContent = expr;
+  el.textContent = expr + "\u00A0";
   el.style.left = zone[0] + "%";
   el.style.top = zone[1] + "%";
   el.style.color = palette.color;

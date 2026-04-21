@@ -665,8 +665,14 @@ body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
   font-weight: 600;
   white-space: nowrap;
   line-height: 1;
+  padding: 0.4em 24px 0.3em 0;
   clip-path: inset(0 100% 0 0);
-  animation: lb-write-in 1.1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: lb-write-in-eq 1.1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes lb-write-in-eq {
+  0%   { clip-path: inset(0 100% 0 0); }
+  100% { clip-path: inset(0 -40px 0 0); }
 }
 
 @keyframes lb-write-in {
