@@ -435,12 +435,22 @@ body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
 
 .modal-box {
   position: relative;
+  z-index: 0;
   background: white;
   border-radius: 16px;
   padding: 32px;
   max-width: 400px;
   width: 100%;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.fireworks-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .modal-close {
@@ -606,10 +616,10 @@ body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
   box-sizing: border-box;
   height: 300px;
   background: #07071a;
-  border-radius: 10px;
+  border-radius: 6px;
   border: 6px solid #1e1e36;
   box-shadow:
-    inset 0 0 80px rgba(0, 5, 40, 0.95),
+    inset 0 0 40px rgba(0, 5, 40, 0.75),
     0 4px 20px rgba(0, 0, 0, 0.5);
   overflow: hidden;
 }
@@ -700,17 +710,14 @@ body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
   inset: 0;
   z-index: 2;
   pointer-events: none;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .home-lb-item {
   position: absolute;
-  font-family: 'Caveat', cursive;
-  font-size: 24px;
-  font-weight: 600;
   white-space: nowrap;
   line-height: 1;
-  padding-right: 12px;
+  padding: 0.4em 12px 0.3em 0;
   clip-path: inset(0 100% 0 0);
   animation: lb-write-in 2.5s cubic-bezier(0.4, 0, 0.2, 1) both;
 }

@@ -6,7 +6,7 @@
   <title>ARITHMIX</title>
   <link rel="stylesheet" href="styles.css?v=32" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Fredoka+One&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Fredoka+One&family=Patrick+Hand&family=Architects+Daughter&family=Kalam:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="container">
@@ -46,7 +46,7 @@
     </div>
 
     <div id="how-to-play" class="how-to-play" style="display: none;">
-      <strong>How to play:</strong> Drag (or tap) numbers from the bank into the empty slots to make the equation equal the <strong>Target</strong>. You have 3 attempts before the solution is revealed.
+      <strong>How to play:</strong> Drag (or tap) numbers from the bank into the empty slots to make the equation equal the <strong>Target</strong>. 
     </div>
 
     <div class="template-area" id="template-area" aria-live="polite"></div>
@@ -98,6 +98,7 @@
 
     <!-- Game Over Modal -->
     <div id="modal" class="modal-overlay" style="display: none;">
+      <canvas id="fireworks-canvas" class="fireworks-canvas"></canvas>
       <div class="modal-box">
         <button id="modalCloseBtn" class="modal-close" aria-label="Close">&#x2715;</button>
         <img id="tim-img" class="tim-img" src="" alt="Tim" />

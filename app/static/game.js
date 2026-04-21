@@ -143,6 +143,7 @@ function startRushMode(minutes) {
   currentDifficulty = 1;
   maxDifficultyReached = 1;
   timeRemaining = minutes * 60;
+  updateTimerDisplay();
   rushStarted = false;
 
   hideModal();
@@ -278,12 +279,89 @@ async function endRushMode() {
 function showModal() {
   const modal = document.getElementById("modal");
   if (modal) modal.style.display = "flex";
+  launchFireworks();
 }
 
 function hideModal() {
   const modal = document.getElementById("modal");
   if (modal) modal.style.display = "none";
+  stopFireworks();
 }
+
+// ── Fireworks ────────────────────────────────────────────────────────────────
+let _fwAnimId = null;
+const _fwParticles = [];
+
+function launchFireworks() {
+  const canvas = document.getElementById("fireworks-canvas");
+  if (!canvas) return;
+  const overlay = canvas.parentElement;
+  canvas.width = overlay.offsetWidth || window.innerWidth;
+  canvas.height = overlay.offsetHeight || window.innerHeight;
+  const ctx = canvas.getContext("2d");
+  _fwParticles.length = 0;
+
+  const COLORS = [0, 30, 55, 200, 280, 340]; // hues
+  let burstsDone = 0;
+  const TOTAL_BURSTS = 9;
+
+  function burst() {
+    if (burstsDone >= TOTAL_BURSTS) return;
+    burstsDone++;
+    const cx = 0.15 * canvas.width + Math.random() * 0.7 * canvas.width;
+    const cy = 0.1 * canvas.height + Math.random() * 0.5 * canvas.height;
+    const hue = COLORS[Math.floor(Math.random() * COLORS.length)];
+    const count = 55;
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.3;
+      const speed = 1.5 + Math.random() * 3.5;
+      _fwParticles.push({
+        x: cx, y: cy,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 0.5,
+        alpha: 1,
+        hue: hue + Math.floor(Math.random() * 40) - 20,
+        r: 2 + Math.random() * 2,
+      });
+    }
+  }
+
+  burst();
+  const iv = setInterval(() => {
+    burst();
+    if (burstsDone >= TOTAL_BURSTS) clearInterval(iv);
+  }, 350);
+
+  function frame() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let i = _fwParticles.length - 1; i >= 0; i--) {
+      const p = _fwParticles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.06;
+      p.alpha -= 0.013;
+      if (p.alpha <= 0) { _fwParticles.splice(i, 1); continue; }
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${p.hue},90%,60%,${p.alpha})`;
+      ctx.fill();
+    }
+    if (_fwParticles.length > 0 || burstsDone < TOTAL_BURSTS) {
+      _fwAnimId = requestAnimationFrame(frame);
+    } else {
+      _fwAnimId = null;
+    }
+  }
+  _fwAnimId = requestAnimationFrame(frame);
+}
+
+function stopFireworks() {
+  if (_fwAnimId) { cancelAnimationFrame(_fwAnimId); _fwAnimId = null; }
+  _fwParticles.length = 0;
+  const canvas = document.getElementById("fireworks-canvas");
+  if (canvas) canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 function dismissRushModal() {
   hideModal();
@@ -1242,8 +1320,28 @@ const HOME_LB_POOL = [
   { text: "n! ~ (n/e)ⁿ√(2πn)",  color: "#00d4ff", glow: "rgba(0,212,255,0.5)"   },
 ];
 
+const HOME_LB_FONTS = [
+  { family: "'Caveat'",              weight: 600 },
+  { family: "'Patrick Hand'",        weight: 400 },
+  { family: "'Architects Daughter'", weight: 400 },
+  { family: "'Kalam'",               weight: 700 },
+  { family: "'Kalam'",               weight: 400 },
+];
+const HOME_LB_SIZES = [17, 21, 25, 30, 36];
+
+function homeLbPickStyle(text) {
+  const font = HOME_LB_FONTS[Math.floor(Math.random() * HOME_LB_FONTS.length)];
+  // Constrain max size for longer strings so they don't overflow
+  const maxSize = text.length > 15 ? 25 : text.length > 11 ? 30 : 36;
+  const sizes = HOME_LB_SIZES.filter(s => s <= maxSize);
+  const size = sizes[Math.floor(Math.random() * sizes.length)];
+  // Width estimate: avg char ≈ size * 0.60px, canvas baseline 640px
+  const widthPct = (text.length * size * 0.62) / 640 * 100;
+  return { family: font.family, weight: font.weight, size, widthPct };
+}
+
 // Doodle pool — approximate half-extents in % of canvas for overlap detection
-const DOODLE_POOL = ['gear', 'sine', 'helix', 'matrix', 'atom', 'fibonacci', 'venn', 'triangle', 'star', 'numberLine'];
+const DOODLE_POOL = ['gear', 'sine', 'helix', 'matrix', 'atom', 'fibonacci', 'venn', 'triangle', 'star', 'numberLine', 'rocket', 'dna', 'lightbulb', 'numtiles'];
 const DOODLE_PCT  = {
   gear:       { rw: 9,  rh: 10 },
   sine:       { rw: 14, rh: 22 },
@@ -1255,6 +1353,10 @@ const DOODLE_PCT  = {
   triangle:   { rw: 10, rh: 10 },
   star:       { rw:  7, rh:  7 },
   numberLine: { rw: 17, rh:  6 },
+  rocket:     { rw:  7, rh: 16 },
+  dna:        { rw:  9, rh: 19 },
+  lightbulb:  { rw: 10, rh: 14 },
+  numtiles:   { rw: 17, rh: 12 },
 };
 
 let homeLbAnimId    = null;
@@ -1278,6 +1380,17 @@ function homeLbBuildParams(type, w, h) {
     case 'triangle':   return { size: h*(0.110+Math.random()*0.040) };
     case 'star':       return { r:  h*(0.055+Math.random()*0.025) };
     case 'numberLine': return { lw: w*(0.140+Math.random()*0.070) };
+    case 'rocket':     return { rh: h*(0.130+Math.random()*0.040) };
+    case 'dna':        return { gw: w*(0.050+Math.random()*0.022), gh: h*(0.22+Math.random()*0.08) };
+    case 'lightbulb':  return { r:  h*(0.075+Math.random()*0.030) };
+    case 'numtiles': {
+      const tw = w*(0.028+Math.random()*0.010);
+      // Pre-shuffle draw order and color assignment so tiles appear in random order
+      const order = [0,1,2,3,4,5,6,7,8].sort(() => Math.random()-0.5);
+      const ci    = [0,1,2,3,4,5,6,7,8].map(() => Math.floor(Math.random()*_TILE_COLORS.length));
+      const nums  = [1,2,3,4,5,6,7,8,9].sort(() => Math.random()-0.5);
+      return { tw, order, ci, nums };
+    }
     default: return {};
   }
 }
@@ -1335,26 +1448,29 @@ function homeLbBuildCfg(w, h) {
 }
 
 // ── Text item position generator ──────────────────────────────────────────────
-function homeLbRandomPositions(count, reservedZones, alreadyPlaced = []) {
-  const placed   = [...alreadyPlaced]; // includes old items for conflict checking
-  const newItems = [];                 // only newly placed positions returned
+// entries: array of {widthPct} — used to clamp right edge per item
+function homeLbRandomPositions(entries, reservedZones, alreadyPlaced = []) {
+  const count    = entries.length;
+  const placed   = [...alreadyPlaced];
+  const newItems = [];
   const MIN_DIST  = 22;
   const MAX_TRIES = 120;
 
-  function conflicts(x, y) {
-    if (x < 1 || x > 86 || y < 1 || y > 92) return true;
+  function conflicts(x, y, wPct) {
+    if (x < 1 || x + wPct > 97 || y < 1 || y > 92) return true;
     if (x > 22 && x < 78 && y > 46) return true;
-    // Check anchor + rightward offsets so text body doesn't overlap doodles
-    for (const tx of [x, x + 10, x + 20]) {
+    // Sample points along the text body to check doodle overlap
+    for (const tx of [x, x + wPct * 0.5, x + wPct]) {
       for (const z of reservedZones) {
         const dx = (tx - z.cx) / z.rw, dy = (y - z.cy) / z.rh;
         if (dx * dx + dy * dy < 1) return true;
       }
     }
-    // Check new item's body against existing items' left edges and right extents
+    // Check against existing items using their stored width (default 20)
     for (const p of placed) {
-      for (const ox of [0, 20]) {
-        const dx = (x + ox) - p.x, dy = (y - p.y) * 1.6;
+      const pw = p.wPct ?? 20;
+      for (const ox of [0, pw * 0.5, pw]) {
+        const dx = (x + wPct * 0.5) - (p.x + ox), dy = (y - p.y) * 1.6;
         if (dx * dx + dy * dy < MIN_DIST * MIN_DIST) return true;
       }
     }
@@ -1362,18 +1478,23 @@ function homeLbRandomPositions(count, reservedZones, alreadyPlaced = []) {
   }
 
   for (let i = 0; i < count; i++) {
+    const wPct = entries[i].widthPct ?? 20;
+    // Max safe x so text fits within the lightboard
+    const maxX = Math.max(2, 97 - wPct);
     let pos = null;
     for (let a = 0; a < MAX_TRIES; a++) {
       let x, y;
       const r = Math.random();
       if (r < 0.55) {
-        x = 2 + Math.random() * 80; y = 2 + Math.random() * 42;
+        x = 2 + Math.random() * Math.min(80, maxX - 2); y = 2 + Math.random() * 42;
       } else if (r < 0.77) {
-        x = 2 + Math.random() * 17; y = 48 + Math.random() * 40;
+        x = 2 + Math.random() * Math.min(17, maxX - 2); y = 48 + Math.random() * 40;
       } else {
-        x = 74 + Math.random() * 12; y = 48 + Math.random() * 40;
+        x = Math.min(74, maxX - 10) + Math.random() * Math.min(12, maxX - Math.min(74, maxX - 10));
+        y = 48 + Math.random() * 40;
       }
-      if (!conflicts(x, y)) { pos = { x, y }; break; }
+      x = Math.min(x, maxX);
+      if (!conflicts(x, y, wPct)) { pos = { x, y, wPct }; break; }
     }
     if (pos) { placed.push(pos); newItems.push(pos); }
     // No fallback — skip items that can't be cleanly placed
@@ -1682,6 +1803,284 @@ function doodleNumberLine(ctx, cx, cy, lw, fade) {
   ctx.restore();
 }
 
+function doodleRocket(ctx, cx, cy, rh, ts, fade) {
+  const bw = rh * 0.32;   // body half-width
+  const bodyTop = cy - rh * 0.46;
+  const bodyBot = cy + rh * 0.18;
+  const noseH   = rh * 0.38;
+  const finH    = rh * 0.26;
+  const finW    = bw * 1.6;
+  ctx.save();
+
+  // Fins
+  ctx.globalAlpha = 0.55 * fade;
+  ctx.strokeStyle = "#FF7043"; ctx.fillStyle = "rgba(255,112,67,0.18)";
+  ctx.lineWidth = 1.3; ctx.shadowColor = "#FF7043"; ctx.shadowBlur = 6;
+  ctx.beginPath();
+  ctx.moveTo(cx - bw, bodyBot - finH);
+  ctx.lineTo(cx - bw - finW, bodyBot + rh * 0.10);
+  ctx.lineTo(cx - bw, bodyBot);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx + bw, bodyBot - finH);
+  ctx.lineTo(cx + bw + finW, bodyBot + rh * 0.10);
+  ctx.lineTo(cx + bw, bodyBot);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  // Body
+  ctx.globalAlpha = 0.50 * fade;
+  ctx.fillStyle = "rgba(255,112,67,0.15)"; ctx.strokeStyle = "#FF7043";
+  ctx.lineWidth = 1.5; ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.moveTo(cx - bw, bodyBot);
+  ctx.lineTo(cx - bw, bodyTop);
+  ctx.quadraticCurveTo(cx - bw, bodyTop - noseH * 0.4, cx, bodyTop - noseH);
+  ctx.quadraticCurveTo(cx + bw, bodyTop - noseH * 0.4, cx + bw, bodyTop);
+  ctx.lineTo(cx + bw, bodyBot);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  // Porthole
+  ctx.globalAlpha = 0.70 * fade;
+  ctx.strokeStyle = "#FFD740"; ctx.fillStyle = "rgba(255,215,64,0.18)";
+  ctx.lineWidth = 1.2; ctx.shadowColor = "#FFD740"; ctx.shadowBlur = 7;
+  ctx.beginPath(); ctx.arc(cx, cy - rh * 0.08, bw * 0.55, 0, Math.PI * 2);
+  ctx.fill(); ctx.stroke();
+
+  // Animated flame — line-drawing style, open strokes only
+  const flicker  = 0.85 + 0.15 * Math.sin(ts * 0.014);
+  const flicker2 = 0.72 + 0.28 * Math.sin(ts * 0.018 + 1.2);
+  const fh = rh * 0.32 * flicker;
+  const fw = bw * 0.75;
+  // outer flame outline (open at base — no closePath)
+  ctx.globalAlpha = 0.80 * fade;
+  ctx.strokeStyle = "#FF7043"; ctx.lineWidth = 1.4;
+  ctx.shadowColor = "#FF7043"; ctx.shadowBlur = 8;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(cx - fw, bodyBot);
+  ctx.quadraticCurveTo(cx - fw * 0.3, bodyBot + fh * 0.5, cx, bodyBot + fh);
+  ctx.quadraticCurveTo(cx + fw * 0.3, bodyBot + fh * 0.5, cx + fw, bodyBot);
+  ctx.stroke();
+  // inner flame line
+  ctx.globalAlpha = 0.90 * fade;
+  ctx.strokeStyle = "#FFD740"; ctx.lineWidth = 1.1;
+  ctx.shadowColor = "#FFD740"; ctx.shadowBlur = 7;
+  ctx.beginPath();
+  ctx.moveTo(cx - fw * 0.38, bodyBot);
+  ctx.quadraticCurveTo(cx, bodyBot + fh * flicker2, cx + fw * 0.38, bodyBot);
+  ctx.stroke();
+  // a thin centre spike
+  ctx.globalAlpha = 0.60 * fade;
+  ctx.strokeStyle = "#FFD740"; ctx.lineWidth = 0.8; ctx.shadowBlur = 5;
+  ctx.beginPath();
+  ctx.moveTo(cx, bodyBot);
+  ctx.lineTo(cx, bodyBot + fh * 1.12 * flicker);
+  ctx.stroke();
+
+  // Exhaust smoke dots drifting down
+  ctx.shadowBlur = 0;
+  for (let i = 0; i < 3; i++) {
+    const phase = (ts * 0.0012 + i * 0.9) % 1;
+    const sy = bodyBot + fh + phase * rh * 0.5;
+    const sx = cx + Math.sin(ts * 0.003 + i * 2.1) * bw * 0.4;
+    const sr = bw * 0.22 * (1 - phase * 0.5);
+    ctx.globalAlpha = 0.25 * (1 - phase) * fade;
+    ctx.fillStyle = "#FFB74D";
+    ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function doodleDNA(ctx, cx, cy, gw, gh, ts, fade) {
+  const top  = cy - gh / 2;
+  const segs = 60;
+  const twists = 3.0;
+  const off = ts * 0.0007;
+  ctx.save();
+
+  // Draw rungs first (behind strands)
+  ctx.lineWidth = 0.9; ctx.shadowBlur = 3;
+  for (let i = 0; i <= segs; i++) {
+    const t  = i / segs;
+    const y  = top + t * gh;
+    const a1 = t * Math.PI * 2 * twists + off;
+    const x1 = cx + (gw / 2) * Math.cos(a1);
+    const x2 = cx + (gw / 2) * Math.cos(a1 + Math.PI);
+    // only draw rung when strands are close to the "side" plane (nearly crossing)
+    const crossness = Math.abs(Math.sin(a1)); // 1 = crossing
+    if (crossness > 0.55 && i % 3 === 0) {
+      ctx.globalAlpha = crossness * 0.45 * fade;
+      ctx.strokeStyle = "#f48fb1"; ctx.shadowColor = "#f48fb1";
+      ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2, y); ctx.stroke();
+    }
+  }
+
+  // Strand A (pink) — draw back-to-front segments
+  for (let i = 0; i < segs; i++) {
+    const t1 = i / segs, t2 = (i + 1) / segs;
+    const a1 = t1 * Math.PI * 2 * twists + off;
+    const a2 = t2 * Math.PI * 2 * twists + off;
+    const depth = (Math.cos(a1) + 1) * 0.5;
+    ctx.globalAlpha = (0.15 + depth * 0.70) * fade;
+    ctx.strokeStyle = "#ff6ec7"; ctx.shadowColor = "#ff6ec7";
+    ctx.lineWidth   = 0.8 + depth * 1.8;
+    ctx.shadowBlur  = 2 + depth * 9;
+    ctx.setLineDash(depth < 0.25 ? [2, 3] : []);
+    ctx.beginPath();
+    ctx.moveTo(cx + (gw / 2) * Math.cos(a1), top + t1 * gh);
+    ctx.lineTo(cx + (gw / 2) * Math.cos(a2), top + t2 * gh);
+    ctx.stroke();
+  }
+
+  // Strand B (cyan) — offset by π
+  for (let i = 0; i < segs; i++) {
+    const t1 = i / segs, t2 = (i + 1) / segs;
+    const a1 = t1 * Math.PI * 2 * twists + off + Math.PI;
+    const a2 = t2 * Math.PI * 2 * twists + off + Math.PI;
+    const depth = (Math.cos(a1) + 1) * 0.5;
+    ctx.globalAlpha = (0.15 + depth * 0.70) * fade;
+    ctx.strokeStyle = "#00d4ff"; ctx.shadowColor = "#00d4ff";
+    ctx.lineWidth   = 0.8 + depth * 1.8;
+    ctx.shadowBlur  = 2 + depth * 9;
+    ctx.setLineDash(depth < 0.25 ? [2, 3] : []);
+    ctx.beginPath();
+    ctx.moveTo(cx + (gw / 2) * Math.cos(a1), top + t1 * gh);
+    ctx.lineTo(cx + (gw / 2) * Math.cos(a2), top + t2 * gh);
+    ctx.stroke();
+  }
+
+  // Travelling highlight dot on each strand
+  const tA = ((ts * 0.0004) % 1);
+  const aA = tA * Math.PI * 2 * twists + off;
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 0.90 * fade;
+  ctx.fillStyle = "#ff6ec7"; ctx.shadowColor = "#ff6ec7"; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.arc(cx + (gw / 2) * Math.cos(aA), top + tA * gh, 2.5, 0, Math.PI * 2); ctx.fill();
+
+  const tB = ((ts * 0.0004 + 0.5) % 1);
+  const aB = tB * Math.PI * 2 * twists + off + Math.PI;
+  ctx.fillStyle = "#00d4ff"; ctx.shadowColor = "#00d4ff";
+  ctx.beginPath(); ctx.arc(cx + (gw / 2) * Math.cos(aB), top + tB * gh, 2.5, 0, Math.PI * 2); ctx.fill();
+
+  ctx.restore();
+}
+
+function doodleLightbulb(ctx, cx, cy, r, ts, fade) {
+  const baseTop = cy + r * 0.55;
+  const baseH   = r * 0.28;
+  const baseW   = r * 0.62;
+  const filH    = r * 0.35;
+  // Pulse glow
+  const pulse = 0.80 + 0.20 * Math.sin(ts * 0.004);
+  ctx.save();
+
+  // Outer glow halo
+  ctx.globalAlpha = 0.10 * pulse * fade;
+  const grad = ctx.createRadialGradient(cx, cy - r * 0.1, r * 0.2, cx, cy - r * 0.1, r * 1.55);
+  grad.addColorStop(0, "#FFD740"); grad.addColorStop(1, "transparent");
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.arc(cx, cy - r * 0.1, r * 1.55, 0, Math.PI * 2); ctx.fill();
+
+  // Bulb
+  ctx.globalAlpha = 0.55 * fade;
+  ctx.strokeStyle = "#FFD740"; ctx.lineWidth = 1.5;
+  ctx.shadowColor = "#FFD740"; ctx.shadowBlur = 8 + 6 * pulse;
+  ctx.fillStyle = `rgba(255,215,64,${0.08 * pulse})`;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+  // Filament squiggle
+  ctx.globalAlpha = 0.80 * pulse * fade;
+  ctx.strokeStyle = "#FFD740"; ctx.lineWidth = 1.2; ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.moveTo(cx - baseW * 0.55, cy + r * 0.25);
+  ctx.lineTo(cx - baseW * 0.55, cy + r * 0.25 - filH * 0.4);
+  ctx.quadraticCurveTo(cx - baseW * 0.2, cy - filH * 0.2, cx, cy - filH * 0.5);
+  ctx.quadraticCurveTo(cx + baseW * 0.2, cy - filH * 0.2, cx + baseW * 0.55, cy + r * 0.25 - filH * 0.4);
+  ctx.lineTo(cx + baseW * 0.55, cy + r * 0.25);
+  ctx.stroke();
+
+  // Base rings
+  ctx.globalAlpha = 0.55 * fade;
+  ctx.lineWidth = 1.3; ctx.shadowBlur = 5;
+  [0, 1, 2].forEach(i => {
+    const by = baseTop + i * (baseH / 2.5);
+    const bx = baseW * (1 - i * 0.12);
+    ctx.beginPath(); ctx.moveTo(cx - bx, by); ctx.lineTo(cx + bx, by); ctx.stroke();
+  });
+
+  // Animated rays
+  ctx.lineWidth = 1.0; ctx.shadowBlur = 4;
+  const rayCount = 8;
+  for (let i = 0; i < rayCount; i++) {
+    const a    = (i / rayCount) * Math.PI * 2 + ts * 0.0008;
+    const rIn  = r * 1.15;
+    const rOut = r * (1.45 + 0.12 * Math.sin(ts * 0.005 + i));
+    ctx.globalAlpha = 0.30 * pulse * fade;
+    ctx.beginPath();
+    ctx.moveTo(cx + rIn  * Math.cos(a), cy + rIn  * Math.sin(a));
+    ctx.lineTo(cx + rOut * Math.cos(a), cy + rOut * Math.sin(a));
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+const _TILE_COLORS = [
+  ["#ff6ec7", "rgba(255,110,199,0.20)"],
+  ["#39ff14", "rgba(57,255,20,0.20)"],
+  ["#ffe033", "rgba(255,224,51,0.20)"],
+  ["#00d4ff", "rgba(0,212,255,0.20)"],
+  ["#ff9d00", "rgba(255,157,0,0.20)"],
+  ["#c77dff", "rgba(199,125,255,0.20)"],
+];
+const _TILE_NUMS = [
+  [3, 7, 2],
+  [9, 4, 1],
+  [8, 5, 6],
+];
+
+function doodleNumtiles(ctx, cx, cy, tw, _ts, fade, order, ci, nums) {
+  const cols = 3, rows = 3;
+  const gap    = tw * 0.18;
+  const totalW = cols * tw + (cols - 1) * gap;
+  const totalH = rows * tw + (rows - 1) * gap;
+  const left   = cx - totalW / 2;
+  const top    = cy - totalH / 2;
+  ctx.save();
+  ctx.font = `700 ${Math.round(tw * 0.55)}px 'Caveat', cursive`;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+
+  // Draw tiles in pre-shuffled order (static — no animation)
+  for (let i = 0; i < 9; i++) {
+    const idx = order[i];
+    const r = (idx / cols) | 0, c = idx % cols;
+    const [stroke, fill] = _TILE_COLORS[ci[idx]];
+    const num = nums[idx];
+    const x = left + c * (tw + gap);
+    const y = top  + r * (tw + gap);
+    const rx = tw * 0.22;
+
+    ctx.globalAlpha = 0.62 * fade;
+    ctx.fillStyle   = fill;
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth   = 1.3;
+    ctx.shadowColor = stroke; ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.moveTo(x + rx, y);
+    ctx.lineTo(x + tw - rx, y);         ctx.arcTo(x + tw, y,      x + tw, y + rx,      rx);
+    ctx.lineTo(x + tw, y + tw - rx);    ctx.arcTo(x + tw, y + tw, x + tw - rx, y + tw, rx);
+    ctx.lineTo(x + rx, y + tw);         ctx.arcTo(x,      y + tw, x,      y + tw - rx, rx);
+    ctx.lineTo(x, y + rx);              ctx.arcTo(x,      y,      x + rx, y,            rx);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+
+    ctx.globalAlpha = 0.85 * fade;
+    ctx.fillStyle   = stroke;
+    ctx.shadowBlur  = 9;
+    ctx.fillText(String(num), x + tw / 2, y + tw / 2);
+  }
+  ctx.restore();
+}
+
 function drawDoodle(ctx, d, ts, fade) {
   const p = d.params;
   switch (d.type) {
@@ -1695,6 +2094,10 @@ function drawDoodle(ctx, d, ts, fade) {
     case 'triangle':   doodleTriangle(ctx, d.cx, d.cy, p.size, fade);          break;
     case 'star':       doodleStar(ctx, d.cx, d.cy, p.r, fade);                 break;
     case 'numberLine': doodleNumberLine(ctx, d.cx, d.cy, p.lw, fade);          break;
+    case 'rocket':     doodleRocket(ctx, d.cx, d.cy, p.rh, ts, fade);         break;
+    case 'dna':        doodleDNA(ctx, d.cx, d.cy, p.gw, p.gh, ts, fade);      break;
+    case 'lightbulb':  doodleLightbulb(ctx, d.cx, d.cy, p.r, ts, fade);       break;
+    case 'numtiles':   doodleNumtiles(ctx, d.cx, d.cy, p.tw, ts, fade, p.order, p.ci, p.nums); break;
   }
 }
 
@@ -1725,13 +2128,18 @@ function showHomeLightboard() {
 
   const poolOrder = HOME_LB_POOL.map((_, i) => i).sort(() => Math.random() - 0.5);
   const count     = 9 + Math.floor(Math.random() * 4);
-  const positions = homeLbRandomPositions(count, doodleReserved());
-  const actual    = positions.length;
-  const selIdx    = poolOrder.slice(0, actual);
+  // Pick styles first so widthPct is available for right-edge-aware placement
+  const selIdx    = poolOrder.slice(0, count);
   const selected  = selIdx.map(i => HOME_LB_POOL[i]);
+  const styles    = selected.map(item => homeLbPickStyle(item.text));
+  const positions = homeLbRandomPositions(styles, doodleReserved());
+  const actual    = positions.length;
 
   // Unified shuffled timeline for text + doodles
-  const textEntries   = selected.map((item, i) => ({ kind: "text", item, pos: positions[i], delay: 0, poolIdx: selIdx[i] }));
+  const textEntries   = selected.slice(0, actual).map((item, i) => ({
+    kind: "text", item, pos: positions[i], delay: 0, poolIdx: selIdx[i],
+    fontFamily: styles[i].family, fontWeight: styles[i].weight, fontSize: styles[i].size,
+  }));
   const doodleEntries = cfg.doodles.map(d => ({ kind: "doodle", d }));
   const allEntries    = [...textEntries, ...doodleEntries].sort(() => Math.random() - 0.5);
   let t = 1 + Math.random() * 2;
@@ -1747,22 +2155,25 @@ function showHomeLightboard() {
 
   // Active item tracking for mutation
   const activeItems = [];
-  const usedPool    = new Set(selIdx);
+  const usedPool    = new Set(selIdx.slice(0, actual));
 
-  function makeTextEl(item, pos, delaySec) {
+  function makeTextEl(item, pos, delaySec, fontFamily, fontWeight, fontSize) {
     const el = document.createElement("div");
     el.className    = "home-lb-item";
     el.textContent  = item.text + " ";
     el.style.left   = pos.x.toFixed(1) + "%";
     el.style.top    = pos.y.toFixed(1) + "%";
     el.style.color  = item.color;
-    el.style.textShadow = `0 0 8px ${item.glow}, 0 0 18px ${item.glow}`;
+    el.style.textShadow  = `0 0 8px ${item.glow}, 0 0 18px ${item.glow}`;
+    el.style.fontFamily  = fontFamily + ", cursive";
+    el.style.fontWeight  = fontWeight;
+    el.style.fontSize    = fontSize + "px";
     el.style.animationDelay = delaySec.toFixed(2) + "s";
     return el;
   }
 
-  textEntries.forEach(({ item, pos, delay, poolIdx }) => {
-    const el = makeTextEl(item, pos, delay);
+  textEntries.forEach(({ item, pos, delay, fontFamily, fontWeight, fontSize, poolIdx }) => {
+    const el = makeTextEl(item, pos, delay, fontFamily, fontWeight, fontSize);
     surface.appendChild(el);
     activeItems.push({ item, pos, el, poolIdx });
   });
@@ -1773,10 +2184,11 @@ function showHomeLightboard() {
     if (!available.length) return;
     const poolIdx = available[Math.floor(Math.random() * available.length)];
     const item    = HOME_LB_POOL[poolIdx];
-    const spots   = homeLbRandomPositions(1, doodleReserved(), activeItems.map(a => a.pos));
+    const style   = homeLbPickStyle(item.text);
+    const spots   = homeLbRandomPositions([style], doodleReserved(), activeItems.map(a => a.pos));
     if (!spots.length) return;
     const pos = spots[0];
-    const el  = makeTextEl(item, pos, 0);
+    const el  = makeTextEl(item, pos, 0, style.family, style.weight, style.size);
     surface.appendChild(el);
     activeItems.push({ item, pos, el, poolIdx });
     usedPool.add(poolIdx);
