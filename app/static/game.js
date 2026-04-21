@@ -14,6 +14,7 @@ let puzzlesSolved = 0;
 let currentDifficulty = 1;
 let maxDifficultyReached = 1;
 let rushIntroPlaying = false;
+let skipIntroAnimation = false;
 let rushStarted = false;
 
 // Share state (captured at end of rush, before Tim is hidden)
@@ -131,7 +132,8 @@ function startPracticeMode() {
   newPuzzle();
 }
 
-function startRushMode(minutes) {
+function startRushMode(minutes, skipIntro = false) {
+  skipIntroAnimation = skipIntro;
   gameMode = minutes === 3 ? "rush3" : "rush5";
   document.body.classList.remove("menu-mode");
   hideHomeLightboard();
@@ -161,6 +163,46 @@ function startRushMode(minutes) {
 
   updateRushUI();
   newPuzzle();
+}
+
+function startCountdown() {
+  const overlay = document.getElementById("countdown-overlay");
+  const numEl = document.getElementById("countdown-number");
+  if (!overlay || !numEl) {
+    rushStarted = true;
+    rushIntroPlaying = false;
+    startTimer();
+    return;
+  }
+
+  let count = 3;
+  overlay.style.display = "flex";
+
+  function tick() {
+    numEl.textContent = count;
+    numEl.style.animation = "none";
+    numEl.offsetWidth; // reflow to restart animation
+    numEl.style.animation = "";
+
+    if (count === 1) {
+      setTimeout(() => {
+        numEl.textContent = "GO!";
+        numEl.style.animation = "none";
+        numEl.offsetWidth;
+        numEl.style.animation = "";
+        setTimeout(() => {
+          overlay.style.display = "none";
+          rushStarted = true;
+          rushIntroPlaying = false;
+          startTimer();
+        }, 700);
+      }, 750);
+      return;
+    }
+    count--;
+    setTimeout(tick, 750);
+  }
+  tick();
 }
 
 function startTimer() {
@@ -279,7 +321,7 @@ async function endRushMode() {
 function showModal() {
   const modal = document.getElementById("modal");
   if (modal) modal.style.display = "flex";
-  launchFireworks();
+  launchCelebration(puzzlesSolved);
 }
 
 function hideModal() {
@@ -288,11 +330,104 @@ function hideModal() {
   stopFireworks();
 }
 
-// ── Fireworks ────────────────────────────────────────────────────────────────
+// ── Celebration ──────────────────────────────────────────────────────────────
 let _fwAnimId = null;
 const _fwParticles = [];
 
-function launchFireworks() {
+function launchCelebration(n) {
+  if (n <= 3) {
+    launchConfettiPoppers(n);
+  } else {
+    launchFireworks(n);
+  }
+}
+
+function launchConfettiPoppers(n) {
+  if (n === 0) return;
+  const canvas = document.getElementById("fireworks-canvas");
+  const timEl = document.getElementById("tim-img");
+  if (!canvas || !timEl) return;
+  const overlay = canvas.parentElement;
+  canvas.width = overlay.offsetWidth || window.innerWidth;
+  canvas.height = overlay.offsetHeight || window.innerHeight;
+  const ctx = canvas.getContext("2d");
+  _fwParticles.length = 0;
+
+  const COLORS = [
+    [255, 60, 60], [255, 210, 50], [50, 210, 80],
+    [70, 160, 255], [210, 60, 210], [255, 155, 50],
+  ];
+
+  const r = timEl.getBoundingClientRect();
+  const tx = r.left + r.width / 2;
+  const ty = r.top + r.height / 2;
+
+  // Origins and spray angles around Tim
+  const pops = [
+    { x: tx,               y: ty - r.height * 0.65, aC: -Math.PI / 2,    spread: Math.PI * 0.55 }, // above
+    { x: tx + r.width * 0.6, y: ty,                 aC: -Math.PI * 0.15, spread: Math.PI * 0.45 }, // right
+    { x: tx - r.width * 0.6, y: ty,                 aC: -Math.PI * 0.85, spread: Math.PI * 0.45 }, // left
+  ].slice(0, n);
+
+  let popsDone = 0;
+
+  function pop() {
+    if (popsDone >= pops.length) return;
+    const pos = pops[popsDone++];
+    for (let i = 0; i < 32; i++) {
+      const angle = pos.aC - pos.spread / 2 + Math.random() * pos.spread;
+      const speed = 1.2 + Math.random() * 2.8;
+      const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+      _fwParticles.push({
+        x: pos.x, y: pos.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        alpha: 1,
+        color,
+        w: 4 + Math.random() * 3,
+        h: 2 + Math.random() * 2,
+        rot: Math.random() * Math.PI * 2,
+        rotV: (Math.random() - 0.5) * 0.25,
+      });
+    }
+  }
+
+  pop();
+  const iv = setInterval(() => {
+    pop();
+    if (popsDone >= pops.length) clearInterval(iv);
+  }, 360);
+
+  function frame() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let i = _fwParticles.length - 1; i >= 0; i--) {
+      const p = _fwParticles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.07;
+      p.vx *= 0.98;
+      p.alpha -= 0.014;
+      p.rot += p.rotV;
+      if (p.alpha <= 0) { _fwParticles.splice(i, 1); continue; }
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.globalAlpha = p.alpha;
+      const [rr, g, b] = p.color;
+      ctx.fillStyle = `rgb(${rr},${g},${b})`;
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      ctx.restore();
+    }
+    if (_fwParticles.length > 0 || popsDone < pops.length) {
+      _fwAnimId = requestAnimationFrame(frame);
+    } else {
+      _fwAnimId = null;
+    }
+  }
+  _fwAnimId = requestAnimationFrame(frame);
+}
+
+function launchFireworks(level) {
   const canvas = document.getElementById("fireworks-canvas");
   if (!canvas) return;
   const overlay = canvas.parentElement;
@@ -301,9 +436,14 @@ function launchFireworks() {
   const ctx = canvas.getContext("2d");
   _fwParticles.length = 0;
 
-  const COLORS = [0, 30, 55, 200, 280, 340]; // hues
+  const COLORS = [0, 30, 55, 200, 280, 340];
+  const scale = level - 4; // 0 at level 4, grows with each level
+  const TOTAL_BURSTS = Math.min(3 + scale * 2, 22);
+  const particleCount = Math.min(35 + scale * 5, 90);
+  const baseSpeed = 1.5 + Math.min(scale * 0.15, 1.5);
+  const burstInterval = Math.max(170, 350 - scale * 25);
+
   let burstsDone = 0;
-  const TOTAL_BURSTS = 9;
 
   function burst() {
     if (burstsDone >= TOTAL_BURSTS) return;
@@ -311,10 +451,9 @@ function launchFireworks() {
     const cx = 0.15 * canvas.width + Math.random() * 0.7 * canvas.width;
     const cy = 0.1 * canvas.height + Math.random() * 0.5 * canvas.height;
     const hue = COLORS[Math.floor(Math.random() * COLORS.length)];
-    const count = 55;
-    for (let i = 0; i < count; i++) {
-      const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.3;
-      const speed = 1.5 + Math.random() * 3.5;
+    for (let i = 0; i < particleCount; i++) {
+      const angle = (Math.PI * 2 * i) / particleCount + (Math.random() - 0.5) * 0.3;
+      const speed = baseSpeed + Math.random() * 3.5;
       _fwParticles.push({
         x: cx, y: cy,
         vx: Math.cos(angle) * speed,
@@ -330,7 +469,7 @@ function launchFireworks() {
   const iv = setInterval(() => {
     burst();
     if (burstsDone >= TOTAL_BURSTS) clearInterval(iv);
-  }, 350);
+  }, burstInterval);
 
   function frame() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -437,7 +576,14 @@ function newPuzzle() {
 
       if (gameMode === "rush3" || gameMode === "rush5") {
         updateRushUI();
-        if (!rushStarted) playWrongFillAnimation();
+        if (!rushStarted) {
+          if (skipIntroAnimation) {
+            skipIntroAnimation = false;
+            startCountdown();
+          } else {
+            playWrongFillAnimation();
+          }
+        }
       } else {
         const targetEl = document.getElementById("target");
         if (targetEl) targetEl.textContent = String(data.target);
@@ -2303,7 +2449,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (playAgainBtn) {
     playAgainBtn.addEventListener("click", () => {
       const was3Min = gameMode === "rush3";
-      startRushMode(was3Min ? 3 : 5);
+      startRushMode(was3Min ? 3 : 5, true);
     });
   }
 
