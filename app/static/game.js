@@ -61,8 +61,12 @@ let scrollLocked = false;
 // ============================================================================
 
 function calculateDifficulty(solved) {
-  // Progressive difficulty: every 3 puzzles increases level
-  return Math.min(6, Math.floor(solved / 3) + 1);
+  if (solved <= 1) return 1;
+  if (solved <= 4) return 2;
+  if (solved <= 7) return 3;
+  if (solved <= 11) return 4;
+  if (solved <= 16) return 5;
+  return 6;
 }
 
 // function getPoints(difficulty) {
