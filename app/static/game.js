@@ -1543,12 +1543,14 @@ const HOME_LB_SIZES = [17, 21, 25, 30, 36];
 
 function homeLbPickStyle(text) {
   const font = HOME_LB_FONTS[Math.floor(Math.random() * HOME_LB_FONTS.length)];
-  // Constrain max size for longer strings so they don't overflow
-  const maxSize = text.length > 15 ? 25 : text.length > 11 ? 30 : 36;
+  const boardEl = document.getElementById("home-lightboard");
+  const boardW = boardEl ? boardEl.offsetWidth : 640;
+  // Scale max size down proportionally when board is narrower than 640px baseline
+  const scale = Math.min(1, boardW / 640);
+  const maxSize = Math.floor((text.length > 15 ? 25 : text.length > 11 ? 30 : 36) * scale);
   const sizes = HOME_LB_SIZES.filter(s => s <= maxSize);
-  const size = sizes[Math.floor(Math.random() * sizes.length)];
-  // Width estimate: avg char ≈ size * 0.60px, canvas baseline 640px
-  const widthPct = (text.length * size * 0.62) / 640 * 100;
+  const size = sizes.length ? sizes[Math.floor(Math.random() * sizes.length)] : HOME_LB_SIZES[0];
+  const widthPct = (text.length * size * 0.62) / boardW * 100;
   return { family: font.family, weight: font.weight, size, widthPct };
 }
 
