@@ -734,7 +734,6 @@ body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
   100% { clip-path: inset(0 0%   0 0); }
 }
 
-
 /* Lightboard share icon (overlaid on board, excluded from capture) */
 .lightboard-share-btn {
   position: absolute;

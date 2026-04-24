@@ -61,12 +61,18 @@ let scrollLocked = false;
 // ============================================================================
 
 function calculateDifficulty(solved) {
-  if (solved <= 1) return 1;
-  if (solved <= 4) return 2;
-  if (solved <= 7) return 3;
-  if (solved <= 11) return 4;
-  if (solved <= 16) return 5;
-  return 6;
+  if (solved <= 1)  return 1;  // puzzle 1
+  if (solved <= 2)  return 2;  // puzzle 2
+  if (solved <= 4)  return 3;  // puzzles 3–4
+  if (solved <= 6)  return 4;  // puzzles 5–6
+  if (solved <= 8)  return 5;  // puzzles 7–8
+  if (solved <= 10) return 6;  // puzzles 9–10
+  if (solved <= 12) return 7;  // puzzles 11–12
+  if (solved <= 13) return 8;  // puzzle 13
+  if (solved <= 14) return 9;  // puzzle 14
+  if (solved <= 15) return 10; // puzzle 15
+  if (solved <= 16) return 11; // rare
+  return 12;                   // exceptional
 }
 
 // function getPoints(difficulty) {
@@ -615,6 +621,7 @@ function unlockPageScroll() {
 // ============================================================================
 
 function newPuzzle() {
+  cancelActiveDrag();
   let endpoint = "/api/puzzle/rush?difficulty=3&decoys=2";
 
   if (gameMode === "rush3" || gameMode === "rush5") {
@@ -1446,6 +1453,18 @@ function pointerCancelHandler(ev) {
   endPointerDrag({ revealOriginal: true, removeClone: true });
   unlockPageScroll();
   updateControls();
+}
+
+function cancelActiveDrag() {
+  if (!pointerState) return;
+  window.removeEventListener("pointermove", pointerMoveHandler);
+  window.removeEventListener("pointerup",   pointerUpHandler);
+  window.removeEventListener("pointercancel", pointerCancelHandler);
+  document.body.classList.remove("dragging");
+  document.querySelectorAll(".slot").forEach(s => s.classList.remove("slot-highlight"));
+  if (pointerState.clone) try { pointerState.clone.remove(); } catch(_) {}
+  if (pointerState.originEl) pointerState.originEl.style.visibility = "";
+  pointerState = null;
 }
 
 function endPointerDrag({ revealOriginal, removeClone }) {

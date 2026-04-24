@@ -33,60 +33,103 @@ OP_PRECEDENCE = {
 }
 
 # Difficulty configs for rush mode
+# max_muls / max_divs: max * or / nodes in the expression tree. None = unlimited.
 DIFFICULTY_CONFIGS = {
+    # ── Addition only ────────────────────────────────────────────────────────
     1: {
         "ops": ["+"],
-        "min_leaf": 1,
-        "max_leaf": 10,
-        "target_min": 15,
-        "target_max": 30,
-        "min_parens": 0,
-        "max_parens": 0,
+        "min_leaf": 1, "max_leaf": 10,
+        "target_min": 10, "target_max": 25,
+        "min_parens": 0, "max_parens": 0,
+        "max_muls": 0,  "max_divs": 0,
     },
+    # ── Subtraction introduced ───────────────────────────────────────────────
     2: {
         "ops": ["+", "-"],
-        "min_leaf": 1,
-        "max_leaf": 15,
-        "target_min": 20,
-        "target_max": 40,
-        "min_parens": 0,
-        "max_parens": 1,
+        "min_leaf": 1, "max_leaf": 12,
+        "target_min": 15, "target_max": 30,
+        "min_parens": 0, "max_parens": 0,
+        "max_muls": 0,  "max_divs": 0,
     },
+    # ── Parentheses around +/- ───────────────────────────────────────────────
     3: {
-        "ops": ["+", "-", "*"],
-        "min_leaf": 1,
-        "max_leaf": 8,
-        "target_min": 30,
-        "target_max": 55,
-        "min_parens": 0,
-        "max_parens": 1,
+        "ops": ["+", "-"],
+        "min_leaf": 1, "max_leaf": 15,
+        "target_min": 20, "target_max": 35,
+        "min_parens": 1, "max_parens": 2,
+        "max_muls": 0,  "max_divs": 0,
     },
+    # ── Single * introduced, no parentheses ──────────────────────────────────
     4: {
         "ops": ["+", "-", "*"],
-        "min_leaf": 2,
-        "max_leaf": 12,
-        "target_min": 45,
-        "target_max": 70,
-        "min_parens": 1,
-        "max_parens": 2,
+        "min_leaf": 1, "max_leaf": 9,
+        "target_min": 25, "target_max": 45,
+        "min_parens": 0, "max_parens": 0,
+        "max_muls": 1,  "max_divs": 0,
     },
+    # ── Multiple *, still no parentheses ─────────────────────────────────────
     5: {
-        "ops": ["+", "-", "*", "/"],
-        "min_leaf": 2,
-        "max_leaf": 15,
-        "target_min": 60,
-        "target_max": 90,
-        "min_parens": 1,
-        "max_parens": 3,
+        "ops": ["+", "-", "*"],
+        "min_leaf": 1, "max_leaf": 10,
+        "target_min": 30, "target_max": 55,
+        "min_parens": 0, "max_parens": 0,
+        "max_muls": None, "max_divs": 0,
     },
+    # ── Single * inside parentheses ──────────────────────────────────────────
     6: {
+        "ops": ["+", "-", "*"],
+        "min_leaf": 2, "max_leaf": 10,
+        "target_min": 35, "target_max": 60,
+        "min_parens": 1, "max_parens": 1,
+        "max_muls": 1,  "max_divs": 0,
+    },
+    # ── Multiple * with parentheses ───────────────────────────────────────────
+    7: {
+        "ops": ["+", "-", "*"],
+        "min_leaf": 2, "max_leaf": 12,
+        "target_min": 45, "target_max": 70,
+        "min_parens": 1, "max_parens": 2,
+        "max_muls": None, "max_divs": 0,
+    },
+    # ── Single / introduced, shallow (no nesting around it) ──────────────────
+    8: {
         "ops": ["+", "-", "*", "/"],
-        "min_leaf": 3,
-        "max_leaf": 18,
-        "target_min": 80,
-        "target_max": 120,
-        "min_parens": 2,
-        "max_parens": 4,
+        "min_leaf": 2, "max_leaf": 12,
+        "target_min": 50, "target_max": 75,
+        "min_parens": 0, "max_parens": 1,
+        "max_muls": 1,  "max_divs": 1,
+    },
+    # ── Multiple /, limited nesting ───────────────────────────────────────────
+    9: {
+        "ops": ["+", "-", "*", "/"],
+        "min_leaf": 2, "max_leaf": 14,
+        "target_min": 60, "target_max": 85,
+        "min_parens": 1, "max_parens": 2,
+        "max_muls": 2,  "max_divs": None,
+    },
+    # ── All ops, moderate nesting ─────────────────────────────────────────────
+    10: {
+        "ops": ["+", "-", "*", "/"],
+        "min_leaf": 3, "max_leaf": 15,
+        "target_min": 70, "target_max": 100,
+        "min_parens": 2, "max_parens": 3,
+        "max_muls": None, "max_divs": None,
+    },
+    # ── All ops, deep nesting ─────────────────────────────────────────────────
+    11: {
+        "ops": ["+", "-", "*", "/"],
+        "min_leaf": 3, "max_leaf": 18,
+        "target_min": 85, "target_max": 115,
+        "min_parens": 3, "max_parens": 4,
+        "max_muls": None, "max_divs": None,
+    },
+    # ── Maximum chaos ─────────────────────────────────────────────────────────
+    12: {
+        "ops": ["+", "-", "*", "/"],
+        "min_leaf": 4, "max_leaf": 20,
+        "target_min": 100, "target_max": 140,
+        "min_parens": 4, "max_parens": 5,
+        "max_muls": None, "max_divs": None,
     },
 }
 
@@ -168,6 +211,14 @@ def collect_leaves(expr: Expr) -> List[int]:
         return [expr]
     left, _, right = expr
     return collect_leaves(left) + collect_leaves(right)
+
+
+def count_op(expr: Expr, op: str) -> int:
+    """Count occurrences of a specific operator in the expression tree."""
+    if isinstance(expr, int):
+        return 0
+    left, node_op, right = expr
+    return (1 if node_op == op else 0) + count_op(left, op) + count_op(right, op)
 
 
 # ============================================================================
@@ -471,9 +522,9 @@ def puzzle_new(
 
 @router.get("/puzzle/rush", response_model=PuzzleOut)
 def puzzle_rush(difficulty: int = 1, decoys: int = 2):
-    """Generate puzzle for rush mode with difficulty 1-6."""
-    if not 1 <= difficulty <= 6:
-        raise HTTPException(status_code=400, detail="difficulty must be 1-6")
+    """Generate puzzle for rush mode with difficulty 1-12."""
+    if not 1 <= difficulty <= 12:
+        raise HTTPException(status_code=400, detail="difficulty must be 1-12")
 
     config = DIFFICULTY_CONFIGS[difficulty]
     logger.info(f"puzzle_rush called: difficulty={difficulty}, decoys={decoys}")
@@ -530,7 +581,14 @@ def puzzle_rush(difficulty: int = 1, decoys: int = 2):
         if placeholder_count != 5:
             continue
 
-        # 8. Enforce parentheses bounds for this difficulty (cheap check)
+        # 8. Enforce operator counts for this difficulty (cheap checks)
+        max_muls = config["max_muls"]
+        max_divs = config["max_divs"]
+        if max_muls is not None and count_op(expr, "*") > max_muls:
+            continue
+        if max_divs is not None and count_op(expr, "/") > max_divs:
+            continue
+
         paren_count = tokens.count("(")
         if not (config["min_parens"] <= paren_count <= config["max_parens"]):
             continue
