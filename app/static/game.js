@@ -24,15 +24,15 @@ let currentShareBlobURL = null;
 // Lightboard
 let lightboardZoneIndex = 0;
 let lightboardShuffledZones = [];
+let lightboardEqEls = [];
 
-// 5 rows × 3 columns of pre-defined positions (left%, top%)
+// 4 rows × 3 columns of pre-defined positions (left%, top%)
 // Shuffled at the start of each rush so the fill pattern is different every game
 const LIGHTBOARD_ZONES = [
-  [2, 5],  [36, 5],  [68, 5],
-  [2, 24], [36, 24], [68, 24],
-  [2, 43], [36, 43], [68, 43],
-  [2, 62],           [68, 62],   // center omitted — Tim occupies bottom-center
-  [2, 80],           [68, 80],   // center omitted — Tim occupies bottom-center
+  [2, 5],  [34, 5],  [67, 5],
+  [2, 32], [34, 32], [67, 32],
+  [2, 59], [34, 59], [67, 59],
+  [2, 79], [34, 79], [67, 79],
 ];
 
 const LIGHTBOARD_COLORS = [
@@ -245,48 +245,103 @@ function updateRushUI() {
 
 async function captureShareBlob() {
   const board = document.getElementById("lightboard");
-  if (!board || typeof html2canvas === "undefined") return null;
+  if (!board) return null;
 
   const scale = 2;
   const boardRect = board.getBoundingClientRect();
-  const w = Math.round(boardRect.width * scale);
+  const w = Math.round(boardRect.width  * scale);
   const h = Math.round(boardRect.height * scale);
 
   const out = document.createElement("canvas");
-  out.width = w;
+  out.width  = w;
   out.height = h;
-  const ctx = out.getContext("2d");
+  const ctx  = out.getContext("2d");
 
-  ctx.fillStyle = "#07071a";
+  // 0. White base — matches the container the board sits on in-game (board itself is transparent)
+  ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, w, h);
 
-  const timImg = board.querySelector(".lightboard-tim");
-  if (timImg && timImg.complete) {
-    const tr = timImg.getBoundingClientRect();
-    ctx.globalAlpha = 0.62;
-    ctx.filter = "brightness(0.9) saturate(0.85)";
-    ctx.drawImage(
-      timImg,
-      (tr.left - boardRect.left) * scale,
-      (tr.top  - boardRect.top)  * scale,
-      tr.width  * scale,
-      tr.height * scale
-    );
-    ctx.filter = "none";
-    ctx.globalAlpha = 1;
+  // 1. Tim — fetch via blob URL to avoid SVG naturalWidth=0 canvas restriction
+  const timImgEl = board.parentElement.querySelector(".lightboard-tim");
+  if (timImgEl) {
+    try {
+      const resp = await fetch(timImgEl.src);
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      await new Promise((res, rej) => {
+        const img = new Image();
+        img.onload = () => {
+          const tr  = timImgEl.getBoundingClientRect();
+          const dx  = (tr.left - boardRect.left) * scale;
+          const dy  = (tr.top  - boardRect.top)  * scale;
+          const dw  = tr.width  * scale;
+          const dh  = tr.height * scale;
+          // Replicate object-fit:cover object-position:right center
+          const nw = img.naturalWidth  || 2189.7706;
+          const nh = img.naturalHeight || 547.0416;
+          const coverScale = tr.height / nh;
+          const srcW = tr.width / coverScale;
+          const srcX = nw - srcW;
+          ctx.save();
+          ctx.globalAlpha = 0.85;
+          try { ctx.filter = "brightness(0.88) saturate(0.9)"; } catch(_) {}
+          ctx.drawImage(img, srcX, 0, srcW, nh, dx, dy, dw, dh);
+          ctx.restore();
+          URL.revokeObjectURL(blobUrl);
+          res();
+        };
+        img.onerror = () => { URL.revokeObjectURL(blobUrl); res(); };
+        img.src = blobUrl;
+      });
+    } catch(_) {}
   }
 
-  const surface = document.getElementById("lightboard-surface");
-  const eqCanvas = await html2canvas(surface, {
-    useCORS: true,
-    scale,
-    backgroundColor: null,
-  });
-  ctx.drawImage(eqCanvas, 0, 0);
+  // 2. Board gradient scrim — mirrors CSS ::before background
+  const grad = ctx.createLinearGradient(0, 0, w, 0);
+  grad.addColorStop(0,    "rgba(0, 0, 0, 0.78)");
+  grad.addColorStop(0.55, "rgba(0, 0, 0, 0.78)");
+  grad.addColorStop(1,    "rgba(18, 18, 48, 0.58)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
 
-  return new Promise((resolve) => {
-    out.toBlob((blob) => resolve(blob), "image/png");
-  });
+  // 2b. Vignette — mirrors CSS ::before inset box-shadow: 0 0 250px rgba(0,5,40,0.35)
+  const vig = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.75);
+  vig.addColorStop(0, "rgba(0,5,40,0)");
+  vig.addColorStop(1, "rgba(0,5,40,0.35)");
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, w, h);
+
+  // 3. Equations — ensure font loaded before drawing
+  try { await document.fonts.load(`600 34px Caveat`); } catch(_) {}
+
+  const surface = document.getElementById("lightboard-surface");
+  if (surface) {
+    ctx.textBaseline = "top";
+    surface.querySelectorAll(".lightboard-eq").forEach(el => {
+      const leftPct  = parseFloat(el.style.left) / 100;
+      const topPct   = parseFloat(el.style.top)  / 100;
+      const x        = leftPct * w;
+      const y        = topPct  * h;
+      const fontSize = parseFloat(window.getComputedStyle(el).fontSize) * scale;
+      const color    = el.style.color || "#fff";
+      const glowMatch = (el.style.textShadow || "").match(/rgba?\([^)]+\)/);
+      const glow     = glowMatch ? glowMatch[0] : color;
+
+      ctx.save();
+      ctx.font      = `600 ${fontSize}px Caveat, cursive`;
+      ctx.fillStyle = color;
+      ctx.shadowColor = glow;
+      ctx.shadowBlur  = 22 * scale;
+      ctx.fillText(el.textContent, x, y);
+      ctx.shadowBlur  = 10 * scale;
+      ctx.fillText(el.textContent, x, y);
+      ctx.shadowBlur  = 0;
+      ctx.fillText(el.textContent, x, y);
+      ctx.restore();
+    });
+  }
+
+  return new Promise(resolve => out.toBlob(blob => resolve(blob), "image/png"));
 }
 
 async function endRushMode() {
@@ -319,6 +374,9 @@ async function endRushMode() {
       ? "/static/images/tim-wave.svg"
       : "/static/images/tim-front.svg";
   }
+
+  const shareBtn = document.getElementById("shareBtn");
+  if (shareBtn) shareBtn.style.display = "";
 
   showModal();
 }
@@ -523,9 +581,8 @@ function dismissRushModal() {
   // Swap End Rush → Menu now that rush is over
   document.getElementById("endRushBtn").style.display = "none";
   document.getElementById("menuBtn").style.display = "inline-block";
-  // Reveal the share icon now that the game is over and modal is gone
-  const shareBtn = document.getElementById("shareBtn");
-  if (shareBtn) shareBtn.style.display = "";
+  // Lock bank items so the puzzle isn't playable after dismissing
+  document.querySelectorAll(".bank-item").forEach(el => el.classList.add("bank-item--locked"));
 }
 
 // ============================================================================
@@ -857,18 +914,23 @@ function addEquationToLightboard(expr) {
   const surface = document.getElementById("lightboard-surface");
   if (!surface) return;
 
-  const zone = lightboardShuffledZones[lightboardZoneIndex % lightboardShuffledZones.length];
+  const slotIdx = lightboardZoneIndex % lightboardShuffledZones.length;
+  const zone    = lightboardShuffledZones[slotIdx];
   const palette = LIGHTBOARD_COLORS[lightboardZoneIndex % LIGHTBOARD_COLORS.length];
   lightboardZoneIndex++;
+
+  if (lightboardEqEls[slotIdx]) lightboardEqEls[slotIdx].remove();
 
   const el = document.createElement("div");
   el.className = "lightboard-eq";
   el.textContent = expr + "\u00A0";
   el.style.left = zone[0] + "%";
-  el.style.top = zone[1] + "%";
+  el.style.top  = zone[1] + "%";
   el.style.color = palette.color;
   el.style.textShadow = `0 0 8px ${palette.glow}, 0 0 18px ${palette.glow}`;
   surface.appendChild(el);
+
+  lightboardEqEls[slotIdx] = el;
 }
 
 function clearLightboard() {
@@ -876,6 +938,7 @@ function clearLightboard() {
   if (surface) surface.innerHTML = "";
   lightboardZoneIndex = 0;
   lightboardShuffledZones = [...LIGHTBOARD_ZONES].sort(() => Math.random() - 0.5);
+  lightboardEqEls = [];
   const timEl = document.getElementById("lightboard-section").querySelector(".lightboard-tim");
   if (timEl) timEl.style.display = "";
   const shareBtn = document.getElementById("shareBtn");
@@ -1455,7 +1518,6 @@ const HOME_LB_POOL = [
   { text: "F = ma",               color: "#39ff14", glow: "rgba(57,255,20,0.5)"   },
   { text: "Est. 1861",            color: "#c77dff", glow: "rgba(199,125,255,0.5)" },
   { text: "∑ 1/n² = π²/6",       color: "#00d4ff", glow: "rgba(0,212,255,0.5)"   },
-  { text: "Mens et Manus",        color: "#ff6ec7", glow: "rgba(255,110,199,0.5)" },
   { text: "ℏω = E",               color: "#ffe033", glow: "rgba(255,224,51,0.5)"  },
   { text: "∇²ψ = 0",              color: "#39ff14", glow: "rgba(57,255,20,0.5)"   },
   { text: "PV = nRT",             color: "#ff9d00", glow: "rgba(255,157,0,0.5)"   },
@@ -1556,18 +1618,13 @@ function homeLbBuildCfg(w, h) {
     for (let attempt = 0; attempt < 80; attempt++) {
       let pctX, pctY;
       const zone = Math.random();
-      if (zone < 0.65) {
-        pctX = sz.rw + Math.random() * Math.max(1, 90 - sz.rw * 2);
+      if (zone < 0.55) {
+        pctX = sz.rw + Math.random() * Math.max(1, 95 - sz.rw * 2);
         pctY = sz.rh + Math.random() * Math.max(1, 44 - sz.rh * 2);
-      } else if (zone < 0.82) {
-        pctX = sz.rw + Math.random() * Math.max(1, 18 - sz.rw * 2);
-        pctY = 50 + sz.rh + Math.random() * Math.max(1, 38 - sz.rh * 2);
       } else {
-        pctX = 80 + Math.random() * Math.max(1, 16 - sz.rw * 2);
+        pctX = sz.rw + Math.random() * Math.max(1, 95 - sz.rw * 2);
         pctY = 50 + sz.rh + Math.random() * Math.max(1, 38 - sz.rh * 2);
       }
-
-      if (pctX > 22 && pctX < 78 && pctY > 46) continue;
 
       const overlaps = doodles.some(d => {
         const osz = DOODLE_PCT[d.type];
@@ -1585,8 +1642,8 @@ function homeLbBuildCfg(w, h) {
     }
 
     if (!placed) {
-      const pctX = sz.rw + Math.random() * Math.max(1, 90 - sz.rw * 2);
-      const pctY = sz.rh + Math.random() * Math.max(1, 40 - sz.rh * 2);
+      const pctX = sz.rw + Math.random() * Math.max(1, 95 - sz.rw * 2);
+      const pctY = sz.rh + Math.random() * Math.max(1, 90 - sz.rh * 2);
       doodles.push({ type, cx: pctX/100*w, cy: pctY/100*h, pctCX: pctX, pctCY: pctY,
                      params: homeLbBuildParams(type, w, h), showMs: 0 });
     }
@@ -1608,7 +1665,6 @@ function homeLbRandomPositions(entries, reservedZones, alreadyPlaced = []) {
 
   function conflicts(x, y, wPct) {
     if (x < 1 || x + wPct > 97 || y < 1 || y > 92) return true;
-    if (x > 22 && x < 78 && y > 46) return true;
     // Sample points along the text body to check doodle overlap
     for (const tx of [x, x + wPct * 0.5, x + wPct]) {
       for (const z of reservedZones) {
@@ -1637,11 +1693,8 @@ function homeLbRandomPositions(entries, reservedZones, alreadyPlaced = []) {
       const r = Math.random();
       if (r < 0.55) {
         x = 2 + Math.random() * Math.min(80, maxX - 2); y = 2 + Math.random() * 42;
-      } else if (r < 0.77) {
-        x = 2 + Math.random() * Math.min(17, maxX - 2); y = 48 + Math.random() * 40;
       } else {
-        x = Math.min(74, maxX - 10) + Math.random() * Math.min(12, maxX - Math.min(74, maxX - 10));
-        y = 48 + Math.random() * 40;
+        x = 2 + Math.random() * (maxX - 2); y = 48 + Math.random() * 40;
       }
       x = Math.min(x, maxX);
       if (!conflicts(x, y, wPct)) { pos = { x, y, wPct }; break; }

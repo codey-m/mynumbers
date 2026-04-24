@@ -4,14 +4,14 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>ARITHMIX</title>
-  <link rel="stylesheet" href="styles.css?v=32" />
+  <link rel="stylesheet" href="styles.css?v=43" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Fredoka+One&family=Patrick+Hand&family=Architects+Daughter&family=Kalam:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="container">
     <h1 class="logo-banner" aria-label="ARITHMIX">
-      <span class="logo-tile lt-a">A</span><span class="logo-tile lt-r">R</span><span class="logo-tile lt-i">I</span><span class="logo-tile lt-t">T</span><span class="logo-tile lt-h">H</span><span class="logo-tile lt-m">M</span><span class="logo-tile lt-i2">I</span><span class="logo-tile lt-x">X</span>
+      <span class="logo-tile lt-i2">A</span><span class="logo-tile lt-h">R</span><span class="logo-tile lt-m">I</span><span class="logo-tile lt-x">T</span><span class="logo-tile lt-m">H</span><span class="logo-tile lt-i2">M</span><span class="logo-tile lt-x">I</span><span class="logo-tile lt-h">X</span>
     </h1>
 
     <!-- Mode Selection (shown at start) -->
@@ -52,7 +52,7 @@
     <div class="template-area" id="template-area" aria-live="polite"></div>
 
     <div class="bank-area" id="bankArea">
-      <h3>Numbers</h3>
+      <!-- <h3>Numbers</h3> -->
       <div id="bank" class="bank"></div>
     </div>
 
@@ -67,8 +67,8 @@
 
     <!-- Home lightboard (visible on menu only) -->
     <div id="home-lightboard-section" class="lightboard-section" style="display:none;">
+      <img class="lightboard-tim" src="/static/images/Tim_three-quarter-full-RGB.svg" alt="Tim" />
       <div class="lightboard" id="home-lightboard">
-        <img class="lightboard-tim" src="/static/images/tim-wave.svg" alt="Tim" />
         <div class="home-lb-surface" id="home-lb-surface"></div>
         <canvas class="home-lb-canvas" id="home-lb-canvas"></canvas>
       </div>
@@ -76,8 +76,8 @@
 
     <!-- Lightboard (rush mode only) -->
     <div id="lightboard-section" class="lightboard-section" style="display: none;">
+      <img class="lightboard-tim" src="/static/images/Tim_three-quarter-full-RGB.svg" alt="Tim" />
       <div class="lightboard" id="lightboard">
-        <img class="lightboard-tim" src="/static/images/tim-wave.svg" alt="Tim" />
         <div class="lightboard-surface" id="lightboard-surface"></div>
         <button id="shareBtn" class="lightboard-share-btn" style="display:none;" aria-label="Share lightboard">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
@@ -124,6 +124,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="game.js?v=36"></script>
+  <script src="game.js?v=42"></script>
 </body>
 </html>
