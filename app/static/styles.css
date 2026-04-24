@@ -649,7 +649,7 @@ body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
   position: relative;
   width: 96%;
   box-sizing: border-box;
-  height: 340px;
+  height: clamp(180px, 37.8vw, 340px);
   background: transparent;
   border-radius: 6px;
   border: 4px solid #40464c;
@@ -694,8 +694,8 @@ body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
 .lightboard-tim {
   position: absolute;
   right: 0;
-  bottom: -75px;
-  height: 300px;
+  bottom: clamp(-75px, -8.3vw, -40px);
+  height: clamp(159px, 33.3vw, 300px);
   width: 36%;
   object-fit: cover;
   object-position: right center;
@@ -734,16 +734,6 @@ body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
   100% { clip-path: inset(0 0%   0 0); }
 }
 
-@media (max-width: 600px) {
-  .lightboard {
-    height: 180px;
-  }
-  .lightboard-tim {
-    height: 230px;
-    bottom: -50px;
-    width: 36%;
-  }
-}
 
 /* Lightboard share icon (overlaid on board, excluded from capture) */
 .lightboard-share-btn {
