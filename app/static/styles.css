@@ -43,6 +43,24 @@ body.menu-mode .logo-tile {
   box-shadow: 0 5px 0 rgba(0, 0, 0, 0.25);
 }
 
+/* Dot-matrix logo */
+h1.logo-dotmatrix {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+h1.logo-dotmatrix #logo-dots-svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+body.menu-mode h1.logo-dotmatrix #logo-dots-svg {
+  width: min(720px, 95vw);
+}
+h1.logo-dotmatrix #logo-dots-svg {
+  width: min(560px, 95vw);
+}
+
 .logo-tile {
   display: inline-flex;
   align-items: center;
