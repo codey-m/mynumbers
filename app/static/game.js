@@ -87,7 +87,7 @@ function setBankAreaVisible(visible) {
 
 function showMenu() {
   window.logoCycle?.startAccentCycle();
-  
+
   gameMode = null;
   setBankAreaVisible(false);
 
@@ -925,7 +925,42 @@ function canCheck() {
 
 const _lbMeasureCanvas = document.createElement("canvas");
 const _lbMeasureCtx    = _lbMeasureCanvas.getContext("2d");
-const LB_BASE_FONT     = 34; // px — matches the max of the CSS clamp
+
+const isMobile = window.innerWidth < 600;
+const LB_BASE_FONT = isMobile ? 22 : 34;
+
+// const targetW = (board ? board.offsetWidth : 500) * (isMobile ? 0.38 : 0.52);
+
+// const fontSize = Math.max(
+//   isMobile ? 9 : 14,
+//   Math.min(LB_BASE_FONT, LB_BASE_FONT * targetW / naturalW)
+// );
+
+function getLightboardFontSize(expr, boardWidth) {
+  const isMobile = window.innerWidth < 600;
+
+  const baseFont = isMobile ? 22 : 34;
+  const targetW = boardWidth * (isMobile ? 0.38 : 0.52);
+
+  _lbMeasureCtx.font = `600 ${baseFont}px Caveat`;
+  const naturalW = _lbMeasureCtx.measureText(expr).width || 1;
+
+  return Math.max(
+    isMobile ? 9 : 14,
+    Math.min(baseFont, baseFont * targetW / naturalW)
+  );
+}
+
+function applyLightboardFontSize(el) {
+  const board = document.getElementById("lightboard");
+  if (!board) return;
+
+  const expr = el.dataset.expr || el.textContent.trim();
+  const rect = board.getBoundingClientRect();
+  const size = getLightboardFontSize(expr, rect.width);
+
+  el.style.fontSize = `${size}px`;
+}
 
 function addEquationToLightboard(expr) {
   const surface = document.getElementById("lightboard-surface");
@@ -941,6 +976,7 @@ function addEquationToLightboard(expr) {
   const el = document.createElement("div");
   el.className = "lightboard-eq";
   el.textContent = expr + "\u00A0";
+  el.dataset.expr = expr;
   el.style.left = zone[0] + "%";
   el.style.top  = zone[1] + "%";
   el.style.color = palette.color;
@@ -948,12 +984,7 @@ function addEquationToLightboard(expr) {
 
   // Scale font-size so every equation occupies roughly the same visual width.
   // Target ≈ 52% of the board's pixel width (leaves room for Tim + margins).
-  const board = surface.closest(".lightboard");
-  const targetW = (board ? board.offsetWidth : 500) * 0.52;
-  _lbMeasureCtx.font = `600 ${LB_BASE_FONT}px Caveat`;
-  const naturalW = _lbMeasureCtx.measureText(expr).width;
-  const fontSize = Math.max(14, Math.min(LB_BASE_FONT, LB_BASE_FONT * targetW / naturalW));
-  el.style.fontSize = fontSize + "px";
+  applyLightboardFontSize(el);
 
   surface.appendChild(el);
   lightboardEqEls[slotIdx] = el;
@@ -2639,7 +2670,27 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  
+  let _lbResizeRAF = null;
+
+  function refreshLightboardEquations() {
+    if (_lbResizeRAF) cancelAnimationFrame(_lbResizeRAF);
+
+    _lbResizeRAF = requestAnimationFrame(() => {
+      document.querySelectorAll(".lightboard-eq").forEach(applyLightboardFontSize);
+    });
+  }
+
+  // Window resize (desktop + orientation change fallback)
+  window.addEventListener("resize", refreshLightboardEquations);
+
+  // ResizeObserver (best for mobile + layout changes)
+  if ("ResizeObserver" in window) {
+    const lb = document.getElementById("lightboard");
+    if (lb) {
+      const ro = new ResizeObserver(refreshLightboardEquations);
+      ro.observe(lb);
+    }
+  }
 
   // Start with menu only (no puzzle)
   showMenu();
