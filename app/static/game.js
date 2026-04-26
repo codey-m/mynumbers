@@ -86,6 +86,8 @@ function setBankAreaVisible(visible) {
 }
 
 function showMenu() {
+  window.logoCycle?.startAccentCycle();
+  
   gameMode = null;
   setBankAreaVisible(false);
 
@@ -122,6 +124,8 @@ function showMenu() {
 }
 
 function startPracticeMode() {
+  window.logoCycle?.stopAccentCycle();
+
   gameMode = "practice";
   document.body.classList.remove("menu-mode");
   hideModal();
@@ -144,6 +148,8 @@ function startPracticeMode() {
 
 function startRushMode(minutes, skipIntro = false) {
   skipIntroAnimation = skipIntro;
+  window.logoCycle?.stopAccentCycle();
+
   gameMode = minutes === 3 ? "rush3" : "rush5";
   document.body.classList.remove("menu-mode");
   hideHomeLightboard();
@@ -917,6 +923,10 @@ function canCheck() {
   return totalSlots > 0 && filledSlots === totalSlots;
 }
 
+const _lbMeasureCanvas = document.createElement("canvas");
+const _lbMeasureCtx    = _lbMeasureCanvas.getContext("2d");
+const LB_BASE_FONT     = 34; // px — matches the max of the CSS clamp
+
 function addEquationToLightboard(expr) {
   const surface = document.getElementById("lightboard-surface");
   if (!surface) return;
@@ -935,8 +945,17 @@ function addEquationToLightboard(expr) {
   el.style.top  = zone[1] + "%";
   el.style.color = palette.color;
   el.style.textShadow = `0 0 8px ${palette.glow}, 0 0 18px ${palette.glow}`;
-  surface.appendChild(el);
 
+  // Scale font-size so every equation occupies roughly the same visual width.
+  // Target ≈ 52% of the board's pixel width (leaves room for Tim + margins).
+  const board = surface.closest(".lightboard");
+  const targetW = (board ? board.offsetWidth : 500) * 0.52;
+  _lbMeasureCtx.font = `600 ${LB_BASE_FONT}px Caveat`;
+  const naturalW = _lbMeasureCtx.measureText(expr).width;
+  const fontSize = Math.max(14, Math.min(LB_BASE_FONT, LB_BASE_FONT * targetW / naturalW));
+  el.style.fontSize = fontSize + "px";
+
+  surface.appendChild(el);
   lightboardEqEls[slotIdx] = el;
 }
 
@@ -1563,14 +1582,18 @@ const HOME_LB_SIZES = [17, 21, 25, 30, 36];
 function homeLbPickStyle(text) {
   const font = HOME_LB_FONTS[Math.floor(Math.random() * HOME_LB_FONTS.length)];
   const boardEl = document.getElementById("home-lightboard");
-  const boardW = boardEl ? boardEl.offsetWidth : 640;
+  const boardW = boardEl ? boardEl.offsetWidth  : 640;
+  const boardH = boardEl ? boardEl.offsetHeight : 300;
   // Scale max size down proportionally when board is narrower than 640px baseline
   const scale = Math.min(1, boardW / 640);
   const maxSize = Math.floor((text.length > 15 ? 25 : text.length > 11 ? 30 : 36) * scale);
   const sizes = HOME_LB_SIZES.filter(s => s <= maxSize);
   const size = sizes.length ? sizes[Math.floor(Math.random() * sizes.length)] : HOME_LB_SIZES[0];
-  const widthPct = (text.length * size * 0.62) / boardW * 100;
-  return { family: font.family, weight: font.weight, size, widthPct };
+  // Canvas measurement is more accurate than the old char-count heuristic
+  _lbMeasureCtx.font = `${font.weight} ${size}px ${font.family}`;
+  const widthPct  = (_lbMeasureCtx.measureText(text).width + 12) / boardW * 100; // +12 for padding
+  const heightPct = (size * 1.75) / boardH * 100; // line-height + vertical padding
+  return { family: font.family, weight: font.weight, size, widthPct, heightPct };
 }
 
 // Doodle pool — approximate half-extents in % of canvas for overlap detection
@@ -1676,7 +1699,7 @@ function homeLbBuildCfg(w, h) {
 }
 
 // ── Text item position generator ──────────────────────────────────────────────
-// entries: array of {widthPct} — used to clamp right edge per item
+// entries: array of {widthPct, heightPct} — used to clamp right/bottom edge per item
 function homeLbRandomPositions(entries, reservedZones, alreadyPlaced = []) {
   const count    = entries.length;
   const placed   = [...alreadyPlaced];
@@ -1684,8 +1707,8 @@ function homeLbRandomPositions(entries, reservedZones, alreadyPlaced = []) {
   const MIN_DIST  = 22;
   const MAX_TRIES = 120;
 
-  function conflicts(x, y, wPct) {
-    if (x < 1 || x + wPct > 97 || y < 1 || y > 92) return true;
+  function conflicts(x, y, wPct, hPct) {
+    if (x < 1 || x + wPct > 95 || y < 1 || y + hPct > 94) return true;
     // Sample points along the text body to check doodle overlap
     for (const tx of [x, x + wPct * 0.5, x + wPct]) {
       for (const z of reservedZones) {
@@ -1706,19 +1729,24 @@ function homeLbRandomPositions(entries, reservedZones, alreadyPlaced = []) {
 
   for (let i = 0; i < count; i++) {
     const wPct = entries[i].widthPct ?? 20;
-    // Max safe x so text fits within the lightboard
-    const maxX = Math.max(2, 97 - wPct);
+    const hPct = entries[i].heightPct ?? 10;
+    // Max safe x/y so text fits within the lightboard
+    const maxX = Math.max(2, 95 - wPct);
+    const maxY = Math.max(2, 94 - hPct);
     let pos = null;
     for (let a = 0; a < MAX_TRIES; a++) {
       let x, y;
       const r = Math.random();
       if (r < 0.55) {
-        x = 2 + Math.random() * Math.min(80, maxX - 2); y = 2 + Math.random() * 42;
+        x = 2 + Math.random() * Math.min(80, maxX - 2);
+        y = 2 + Math.random() * Math.min(42, maxY - 2);
       } else {
-        x = 2 + Math.random() * (maxX - 2); y = 48 + Math.random() * 40;
+        x = 2 + Math.random() * (maxX - 2);
+        y = Math.min(48, maxY - 2) + Math.random() * Math.max(0, maxY - Math.min(48, maxY - 2));
       }
       x = Math.min(x, maxX);
-      if (!conflicts(x, y, wPct)) { pos = { x, y, wPct }; break; }
+      y = Math.min(y, maxY);
+      if (!conflicts(x, y, wPct, hPct)) { pos = { x, y, wPct, hPct }; break; }
     }
     if (pos) { placed.push(pos); newItems.push(pos); }
     // No fallback — skip items that can't be cleanly placed

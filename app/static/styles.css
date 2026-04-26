@@ -610,6 +610,18 @@ body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
 
 /* Mobile adjustments */
 @media (max-width: 600px) {
+  /* Tighten + equalize the two vertical gaps in menu mode:
+     logo→mode-selector and mode-selector→lightboard (both 20px). */
+  body.menu-mode h1.logo-banner {
+    margin-bottom: 20px;
+  }
+  body.menu-mode .mode-selector {
+    margin-bottom: 10px;
+  }
+  body.menu-mode .lightboard-section {
+    margin-top: 10px;
+  }
+
   .mode-selector {
     gap: 6px;
   }

@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>ARITHMIX</title>
-  <link rel="stylesheet" href="styles.css?v=49" />
+  <link rel="stylesheet" href="styles.css?v=52" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Fredoka+One&family=Patrick+Hand&family=Architects+Daughter&family=Kalam:wght@400;700&display=swap" rel="stylesheet">
 </head>
@@ -178,6 +178,9 @@
       svg.setAttribute("height", H);
       svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
 
+      const ACCENT_COLORS = ["#00C853", "#1E63D8", "#FFC107"];
+      const accentDots = []; // { el, offset }
+
       cells.forEach(([x, y], i) => {
         const cx = PAD + x * STEP + R;
         const cy = PAD + y * STEP + R;
@@ -185,9 +188,63 @@
         c.setAttribute("cx", cx);
         c.setAttribute("cy", cy);
         c.setAttribute("r", R);
-        c.setAttribute("fill", colorOf[i]);
+        if (colorOf[i] === RED) {
+          c.setAttribute("fill", RED);
+        } else {
+          const offset = Math.floor(rand() * 3); // phase offset: 0, 1, or 2
+          c.setAttribute("fill", ACCENT_COLORS[offset]);
+          accentDots.push({ el: c, offset });
+        }
         svg.appendChild(c);
       });
+
+      // JS-driven cycle: all dots advance together on each tick,
+      // random dwell 2–4 s per step so the rhythm feels organic.
+      let cycleStep = 0;
+      let cycleTimeoutId = null;
+      let cycling = true;
+
+      function advanceCycle() {
+        if (!cycling) return;
+
+        cycleStep = (cycleStep + 1) % 3;
+
+        accentDots.forEach(({ el, offset }) => {
+          el.setAttribute("fill", ACCENT_COLORS[(cycleStep + offset) % 3]);
+        });
+
+        scheduleNext();
+      }
+
+      function scheduleNext() {
+        const dwell = 2000 + rand() * 3000;
+        cycleTimeoutId = setTimeout(advanceCycle, dwell);
+      }
+
+      function startAccentCycle() {
+        if (cycling) return;
+        cycling = true;
+        
+        // resume the loop
+        scheduleNext();
+      }
+
+      function stopAccentCycle() {
+        cycling = false;
+        // if (cycleTimeoutId !== null) {
+        //   clearTimeout(cycleTimeoutId);
+        //   cycleTimeoutId = null;
+        // }
+      }
+
+      // start automatically on load (menu)
+      cycleTimeoutId = setTimeout(advanceCycle, 2000 + rand() * 3000);
+
+      // expose to rest of app
+      window.logoCycle = {
+        startAccentCycle,
+        stopAccentCycle
+      };
     })();
     </script>
 
