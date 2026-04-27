@@ -32,7 +32,7 @@ h1.logo-banner {
 }
 
 body.menu-mode h1.logo-banner {
-  margin-bottom: 60px;
+  margin-bottom: 26px;
 }
 
 body.menu-mode .logo-tile {
@@ -366,11 +366,12 @@ body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
 }
 
 .mode-btn {
-  padding: 10px 20px;
+  padding: clamp(10px, 1.1vw, 16px) clamp(20px, 2.4vw, 36px);
   border: 2px solid #750014;
   border-radius: 8px;
   background: #750014;
   color: #fff;
+  font-size: clamp(16px, 1.4vw, 22px);
   font-weight: 600;
   cursor: pointer;
   transition: all 150ms;

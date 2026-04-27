@@ -925,41 +925,59 @@ function canCheck() {
 
 const _lbMeasureCanvas = document.createElement("canvas");
 const _lbMeasureCtx    = _lbMeasureCanvas.getContext("2d");
+const LB_BASE_FONT     = 34;
+const LB_MIN_FONT      = 12;
+// Column boundaries in % of board width. Each equation gets the slice from its
+// zone's left edge to the next boundary, so columns never overlap horizontally.
+const LB_COL_BOUNDS    = [2, 34, 67, 92];
+// Right padding on .lightboard-eq (in px) — reserved for the write-in animation
+// overshoot. Subtracts from the equation's available text width.
+const LB_RIGHT_PAD_PX  = 24;
+// Multiplier on available width to keep a small breathing gap between columns.
+const LB_WIDTH_SAFETY  = 0.95;
+// Total line-box height in em (line-height: 1 + padding 0.4em + 0.3em).
+// Used to vertically re-center smaller equations against the row anchor.
+const LB_LINE_HEIGHT_EM = 1.7;
 
-const isMobile = window.innerWidth < 600;
-const LB_BASE_FONT = isMobile ? 22 : 34;
+function lbAvailablePct(zoneLeftPct) {
+  const next = LB_COL_BOUNDS.find(b => b > zoneLeftPct) ?? 92;
+  return next - zoneLeftPct;
+}
 
-// const targetW = (board ? board.offsetWidth : 500) * (isMobile ? 0.38 : 0.52);
+function getLightboardFontSize(expr, boardWidth, zoneLeftPct) {
+  const slotW   = lbAvailablePct(zoneLeftPct) / 100 * boardWidth;
+  const targetW = Math.max(1, slotW * LB_WIDTH_SAFETY - LB_RIGHT_PAD_PX);
 
-// const fontSize = Math.max(
-//   isMobile ? 9 : 14,
-//   Math.min(LB_BASE_FONT, LB_BASE_FONT * targetW / naturalW)
-// );
-
-function getLightboardFontSize(expr, boardWidth) {
-  const isMobile = window.innerWidth < 600;
-
-  const baseFont = isMobile ? 22 : 34;
-  const targetW = boardWidth * (isMobile ? 0.38 : 0.52);
-
-  _lbMeasureCtx.font = `600 ${baseFont}px Caveat`;
+  _lbMeasureCtx.font = `600 ${LB_BASE_FONT}px Caveat`;
   const naturalW = _lbMeasureCtx.measureText(expr).width || 1;
 
-  return Math.max(
-    isMobile ? 9 : 14,
-    Math.min(baseFont, baseFont * targetW / naturalW)
-  );
+  return Math.max(LB_MIN_FONT, Math.min(LB_BASE_FONT, LB_BASE_FONT * targetW / naturalW));
 }
 
 function applyLightboardFontSize(el) {
   const board = document.getElementById("lightboard");
   if (!board) return;
 
-  const expr = el.dataset.expr || el.textContent.trim();
-  const rect = board.getBoundingClientRect();
-  const size = getLightboardFontSize(expr, rect.width);
+  const expr        = el.dataset.expr || el.textContent.trim();
+  const boardWidth  = board.getBoundingClientRect().width;
+  const zoneLeftPct = parseFloat(el.style.left) || 2;
+  const size        = getLightboardFontSize(expr, boardWidth, zoneLeftPct);
 
-  el.style.fontSize = `${size}px`;
+  el.style.fontSize = size + "px";
+  // Center the equation vertically against where a base-size equation would
+  // sit, so shorter (smaller-font) equations don't ride up to the top of the
+  // row band relative to taller ones.
+  const offsetY = (LB_BASE_FONT - size) * LB_LINE_HEIGHT_EM / 2;
+  el.style.transform = offsetY > 0 ? `translateY(${offsetY.toFixed(1)}px)` : "";
+}
+
+// Caveat loads async from Google Fonts; canvas measureText falls back to a
+// narrower font until it's ready, producing oversized equations on first paint.
+// Re-apply once the font lands.
+if (document.fonts && document.fonts.load) {
+  document.fonts.load(`600 ${LB_BASE_FONT}px Caveat`).then(() => {
+    document.querySelectorAll(".lightboard-eq").forEach(applyLightboardFontSize);
+  }).catch(() => {});
 }
 
 function addEquationToLightboard(expr) {
@@ -1580,7 +1598,7 @@ function animatePointerCloneIntoSlot({ dragClone, originEl, slot }) {
 // ============================================================================
 
 const HOME_LB_POOL = [
-  { text: "e^(iπ) + 1 = 0",      color: "#ff6ec7", glow: "rgba(255,110,199,0.5)" },
+  { text: "e<sup>iπ</sup> + 1 = 0", color: "#ff6ec7", glow: "rgba(255,110,199,0.5)" },
   { text: "π ≈ 3.14159",          color: "#00d4ff", glow: "rgba(0,212,255,0.5)"   },
   { text: "E = mc²",              color: "#ffe033", glow: "rgba(255,224,51,0.5)"  },
   { text: "√2 ≈ 1.414",           color: "#ff9d00", glow: "rgba(255,157,0,0.5)"   },
@@ -1620,10 +1638,12 @@ function homeLbPickStyle(text) {
   const maxSize = Math.floor((text.length > 15 ? 25 : text.length > 11 ? 30 : 36) * scale);
   const sizes = HOME_LB_SIZES.filter(s => s <= maxSize);
   const size = sizes.length ? sizes[Math.floor(Math.random() * sizes.length)] : HOME_LB_SIZES[0];
-  // Canvas measurement is more accurate than the old char-count heuristic
+  // Strip HTML tags (e.g. <sup>) before measuring — superscripts render
+  // narrower than the base text, so this slightly over-estimates which is safe.
+  const plain = text.replace(/<[^>]+>/g, "");
   _lbMeasureCtx.font = `${font.weight} ${size}px ${font.family}`;
-  const widthPct  = (_lbMeasureCtx.measureText(text).width + 12) / boardW * 100; // +12 for padding
-  const heightPct = (size * 1.75) / boardH * 100; // line-height + vertical padding
+  const widthPct  = (_lbMeasureCtx.measureText(plain).width + 12) / boardW * 100;
+  const heightPct = (size * 1.75) / boardH * 100;
   return { family: font.family, weight: font.weight, size, widthPct, heightPct };
 }
 
@@ -1655,6 +1675,34 @@ let homeLbStartTs   = null;
 let homeLbCfg       = null;
 
 // ── Doodle params and placement ───────────────────────────────────────────────
+// Maps each doodle type's pixel-valued params to the axis (w/h) they scale
+// with. Used by resizeHomeLightboard() to rescale params on board resize.
+const DOODLE_PARAM_AXES = {
+  gear:       { r:  "h" },
+  sine:       { gw: "w", gh: "h" },
+  helix:      { gw: "w", gh: "h" },
+  matrix:     { cw: "w", ch: "h" },
+  atom:       { r:  "h" },
+  fibonacci:  { r:  "h" },
+  venn:       { r:  "w" },
+  triangle:   { size: "h" },
+  star:       { r:  "h" },
+  numberLine: { lw: "w" },
+  rocket:     { rh: "h" },
+  dna:        { gw: "w", gh: "h" },
+  lightbulb:  { r:  "h" },
+  numtiles:   { tw: "w" }, // order/ci/nums are non-pixel and stay fixed
+};
+
+function homeLbScaleParams(type, params, wRatio, hRatio) {
+  const axes = DOODLE_PARAM_AXES[type];
+  if (!axes) return;
+  for (const key in axes) {
+    if (typeof params[key] !== "number") continue;
+    params[key] *= (axes[key] === "w" ? wRatio : hRatio);
+  }
+}
+
 function homeLbBuildParams(type, w, h) {
   switch (type) {
     case 'gear':       return { r:  h*(0.060+Math.random()*0.035) };
@@ -2443,7 +2491,9 @@ function showHomeLightboard() {
   function makeTextEl(item, pos, delaySec, fontFamily, fontWeight, fontSize) {
     const el = document.createElement("div");
     el.className    = "home-lb-item";
-    el.textContent  = item.text + " ";
+    // item.text may contain inline HTML (e.g. <sup> for exponents). All entries
+    // in HOME_LB_POOL must remain free of unescaped <, >, & outside of intentional markup.
+    el.innerHTML    = item.text + " ";
     el.style.left   = pos.x.toFixed(1) + "%";
     el.style.top    = pos.y.toFixed(1) + "%";
     el.style.color  = item.color;
@@ -2452,6 +2502,11 @@ function showHomeLightboard() {
     el.style.fontWeight  = fontWeight;
     el.style.fontSize    = fontSize + "px";
     el.style.animationDelay = delaySec.toFixed(2) + "s";
+    // Record creation-time size + board width so refreshHomeLightboardItems()
+    // can rescale this element proportionally when the board resizes.
+    const lbEl = document.getElementById("home-lightboard");
+    el.dataset.origFontPx = String(fontSize);
+    el.dataset.origBoardW = String(lbEl ? lbEl.offsetWidth : 640);
     return el;
   }
 
@@ -2504,14 +2559,16 @@ function showHomeLightboard() {
     if (!homeLbStartTs) { homeLbStartTs = ts; fwNext = ts + 4500; }
     const elapsed = ts - homeLbStartTs;
     const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, w, h);
+    // Read live canvas dims each frame so resizeHomeLightboard() takes effect.
+    const cw = canvas.width, ch = canvas.height;
+    ctx.clearRect(0, 0, cw, ch);
 
     cfg.doodles.forEach(d => {
       const fade = Math.min(1, Math.max(0, (elapsed - d.showMs) / 2500));
       if (fade > 0) drawDoodle(ctx, d, ts, fade);
     });
 
-    if (!homeLbFw && ts >= fwNext) { homeLbFw = homeLbNewFw(w, h); fwNext = ts + 9000 + Math.random() * 5000; }
+    if (!homeLbFw && ts >= fwNext) { homeLbFw = homeLbNewFw(cw, ch); fwNext = ts + 9000 + Math.random() * 5000; }
     if (homeLbFw && homeLbTickFw(ctx, homeLbFw, ts)) homeLbFw = null;
   }
 
@@ -2672,11 +2729,55 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let _lbResizeRAF = null;
 
+  function refreshHomeLightboardItems() {
+    const board = document.getElementById("home-lightboard");
+    if (!board) return;
+    const w = board.offsetWidth;
+    if (!w) return;
+    document.querySelectorAll(".home-lb-item").forEach(el => {
+      const origPx = parseFloat(el.dataset.origFontPx);
+      const origW  = parseFloat(el.dataset.origBoardW);
+      if (!origPx || !origW) return;
+      el.style.fontSize = (origPx * w / origW).toFixed(1) + "px";
+    });
+  }
+
+  function resizeHomeLightboardCanvas() {
+    const canvas = document.getElementById("home-lb-canvas");
+    const lb     = document.getElementById("home-lightboard");
+    if (!canvas || !lb || !homeLbCfg) return;
+
+    const newW = lb.offsetWidth;
+    const newH = lb.offsetHeight;
+    if (!newW || !newH) return;
+
+    const oldW = canvas.width;
+    const oldH = canvas.height;
+    if (oldW === newW && oldH === newH) return;
+
+    canvas.width  = newW;
+    canvas.height = newH;
+
+    const wRatio = oldW ? newW / oldW : 1;
+    const hRatio = oldH ? newH / oldH : 1;
+
+    homeLbCfg.doodles.forEach(d => {
+      d.cx = d.pctCX / 100 * newW;
+      d.cy = d.pctCY / 100 * newH;
+      homeLbScaleParams(d.type, d.params, wRatio, hRatio);
+    });
+
+    // Drop the in-flight firework so the next one is launched at fresh dims.
+    homeLbFw = null;
+  }
+
   function refreshLightboardEquations() {
     if (_lbResizeRAF) cancelAnimationFrame(_lbResizeRAF);
 
     _lbResizeRAF = requestAnimationFrame(() => {
       document.querySelectorAll(".lightboard-eq").forEach(applyLightboardFontSize);
+      refreshHomeLightboardItems();
+      resizeHomeLightboardCanvas();
     });
   }
 
@@ -2689,6 +2790,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (lb) {
       const ro = new ResizeObserver(refreshLightboardEquations);
       ro.observe(lb);
+    }
+    const homeLb = document.getElementById("home-lightboard");
+    if (homeLb) {
+      const ro = new ResizeObserver(refreshLightboardEquations);
+      ro.observe(homeLb);
     }
   }
 

@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>ARITHMIX</title>
-  <link rel="stylesheet" href="styles.css?v=52" />
+  <link rel="stylesheet" href="styles.css?v=54" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Fredoka+One&family=Patrick+Hand&family=Architects+Daughter&family=Kalam:wght@400;700&display=swap" rel="stylesheet">
 </head>
@@ -17,9 +17,8 @@
     (function buildDotMatrixLogo() {
       // Wheaton-inspired letterforms (square proportions, square endpoints).
       // Stroke-weight rule:
-      //   • Vertical/diagonal strokes (stems, legs, A's sides) → 3 bulbs
-      //   • Horizontal bars (mid-bars, T cap, R bowl top/bottom)  → 2 bulbs
-      //   • R bowl right curve                                    → 2 bulbs
+      //   • Vertical strokes (stems, legs, A's sides, R bowl edges) → 3 bulbs
+      //   • Horizontal bars (mid-bars, T cap, R bowl top/bottom)    → 2 bulbs
       // 11 rows tall, ~11 cols wide for square letters.
       const L = {
         A: [
@@ -38,11 +37,11 @@
         R: [
           "XXXXXXXXXXX",
           "XXXXXXXXXXX",
-          "XXX......XX",
-          "XXX......XX",
-          "XXX......XX",
+          "XXX.....XXX",
+          "XXX.....XXX",
           "XXXXXXXXXXX",
           "XXXXXXXXXXX",
+          "XXX.XXX....",
           "XXX..XXX...",
           "XXX...XXX..",
           "XXX....XXX.",
@@ -358,6 +357,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="game.js?v=42"></script>
+  <script src="game.js?v=45"></script>
 </body>
 </html>
