@@ -929,7 +929,10 @@ const LB_BASE_FONT     = 34;
 const LB_MIN_FONT      = 12;
 // Column boundaries in % of board width. Each equation gets the slice from its
 // zone's left edge to the next boundary, so columns never overlap horizontally.
-const LB_COL_BOUNDS    = [2, 34, 67, 92];
+// The trailing 100 lets column 3 extend to the right edge of the board; the
+// LB_WIDTH_SAFETY multiplier and LB_RIGHT_PAD_PX subtraction below provide the
+// visual right-margin so equations don't actually butt against the border.
+const LB_COL_BOUNDS    = [2, 34, 67, 100];
 // Right padding on .lightboard-eq (in px) — reserved for the write-in animation
 // overshoot. Subtracts from the equation's available text width.
 const LB_RIGHT_PAD_PX  = 24;
