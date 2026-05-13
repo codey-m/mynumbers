@@ -4,13 +4,13 @@ A math puzzle game where you arrange numbers into equation templates to hit targ
 
 ## Play Now
 
-🎮 **[Play ARITHMIX](https://mynumbers.onrender.com/static/game.html)**
+🎮 **[Play ARITHMIX](https://mynumbers.onrender.com)**
 
 ## Features
 
 - **Practice Mode**: Solve puzzles at your own pace 
 - **Rush Mode**: Race against the clock (3-min or 5-min challenges)
-- **Progressive Difficulty**: Puzzles automatically increase in complexity as you advance
+- **Inside ARITHMIX:** Explore the math and data structures behind the game.
 
 ## How to Play
 
