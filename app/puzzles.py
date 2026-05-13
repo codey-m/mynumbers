@@ -90,6 +90,7 @@ DIFFICULTY_CONFIGS = {
         "target_min": 50, "target_max": 75,
         "min_parens": 0, "max_parens": 1,
         "max_muls": 1,  "max_divs": 1,
+        "min_divs": 1,
     },
     # ── Multiple * with parentheses ───────────────────────────────────────────
     8: {
@@ -585,9 +586,12 @@ def puzzle_rush(difficulty: int = 1, decoys: int = 2):
         # 8. Enforce operator counts for this difficulty (cheap checks)
         max_muls = config["max_muls"]
         max_divs = config["max_divs"]
+        min_divs = config.get("min_divs", 0)
         if max_muls is not None and count_op(expr, "*") > max_muls:
             continue
         if max_divs is not None and count_op(expr, "/") > max_divs:
+            continue
+        if count_op(expr, "/") < min_divs:
             continue
 
         paren_count = tokens.count("(")
