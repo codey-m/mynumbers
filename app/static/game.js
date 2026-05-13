@@ -50,7 +50,7 @@ const SNAP_ANIM_MS = 180;
 const TAP_MOVE_PX = 18;
 const CLICK_SUPPRESS_MS = 1200;
 
-const GAME_URL = "https://mynumbers.onrender.com/static/game.html";
+const GAME_URL = "https://mynumbers.onrender.com/";
 
 let suppressClickUntil = 0;
 let pointerState = null;
@@ -86,6 +86,13 @@ function setBankAreaVisible(visible) {
 }
 
 function showMenu() {
+  // Mark this shared-route entry as menu state. Idempotent — only writes
+  // when the marker isn't already correct, so refresh / repeated calls
+  // don't churn the history stack.
+  if (history.state?.arithmix !== "menu") {
+    history.replaceState({ arithmix: "menu" }, "", "/");
+  }
+
   window.logoCycle?.startAccentCycle();
 
   gameMode = null;
@@ -124,6 +131,11 @@ function showMenu() {
 }
 
 function startPracticeMode() {
+  // Mark this shared-route entry as game state. If the user clicks Inside
+  // ARITHMIX from here, the Inside-link handler overwrites this back to
+  // 'menu' so the entry behind /explainer always represents menu.
+  history.replaceState({ arithmix: "game" }, "", "/");
+
   window.logoCycle?.stopAccentCycle();
 
   gameMode = "practice";
@@ -147,6 +159,9 @@ function startPracticeMode() {
 }
 
 function startRushMode(minutes, skipIntro = false) {
+  // See note in startPracticeMode() — same state-marker policy.
+  history.replaceState({ arithmix: "game" }, "", "/");
+
   skipIntroAnimation = skipIntro;
   window.logoCycle?.stopAccentCycle();
 
@@ -2623,6 +2638,42 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const rush5Btn = document.getElementById("rush5Btn");
   if (rush5Btn) rush5Btn.addEventListener("click", () => startRushMode(5));
+
+  // Inside ARITHMIX explainer link. Two-step navigation to enforce the
+  // invariant "entry behind /explainer is menu state":
+  //   1. replaceState marks the current shared-route entry as menu — even
+  //      if the user was mid-game, the entry left behind now represents
+  //      the menu, so browser Back from /explainer lands on menu.
+  //   2. location.assign pushes a new /explainer entry. The ?from=app
+  //      query tells explainer.js a menu entry is already behind it, so
+  //      it skips its own seeding logic (no junk chain on round-trips).
+  // Bail on modifier/middle-clicks so "Open in new tab" still works.
+  const explainerLink = document.querySelector(".explainer-link");
+  if (explainerLink) {
+    explainerLink.addEventListener("click", (e) => {
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      history.replaceState({ arithmix: "menu" }, "", "/");
+      window.location.assign("/explainer?from=app");
+    });
+  }
+
+  // bfcache restoration: any time the browser brings this page back from
+  // a cached snapshot — typically the user pressing Back from /explainer
+  // after having started a game in this tab — drop to the menu. We do not
+  // honor history.state here because the user can reach /explainer via
+  // routes that bypass game.js's in-app link handler (e.g., browser
+  // Forward from a game entry into a previously visited /explainer entry),
+  // leaving the / entry marked "game" instead of "menu". Showing the
+  // menu unconditionally on persisted pageshow keeps the "menu sits
+  // behind /explainer" invariant intact even on those paths, and ensures
+  // an in-progress game never silently resumes after the user navigated
+  // away. showMenu() also rewrites history.state back to "menu".
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted) {
+      showMenu();
+    }
+  });
 
   const endRushBtn = document.getElementById("endRushBtn");
   if (endRushBtn) {

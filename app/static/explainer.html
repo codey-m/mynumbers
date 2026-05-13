@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>ARITHMIX — Explainer</title>
+  <link rel="stylesheet" href="/static/styles.css?v=54" />
+  <link rel="stylesheet" href="/static/explainer.css?v=2" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Fredoka+One&family=Patrick+Hand&family=Architects+Daughter&family=Kalam:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body class="explainer-mode">
+  <div class="container explainer-container">
+
+    <!-- ── Top bar ── -->
+    <header class="ex-topbar" aria-label="Explainer navigation">
+      <a href="/" class="ex-back" aria-label="Back to game">←</a>
+      <div class="ex-title-block">
+        <div class="ex-title">Inside <span class="ex-brand">ARITHMIX</span></div>
+        <div class="ex-subtitle" id="ex-slide-subtitle">From random expression to playable challenge</div>
+      </div>
+      <div class="ex-counter"><span id="ex-current">1</span>/<span id="ex-total">5</span></div>
+    </header>
+
+    <div class="ex-progress" aria-hidden="true">
+      <div class="ex-progress-fill" id="ex-progress-fill"></div>
+    </div>
+
+    <!-- ── Persistent puzzle strip (mini gameplay UI) ── -->
+    <section class="ex-puzzle-strip" aria-label="Running example puzzle">
+      <div class="ex-mini-target">
+        <span class="ex-mini-label">Target</span>
+        <span class="ex-mini-target-val">29</span>
+      </div>
+      <div class="ex-mini-template" aria-label="Template">
+        <span class="ex-tok ex-tok-paren">(</span><span class="ex-tok ex-tok-paren">(</span>
+        <span class="ex-mini-slot">__</span>
+        <span class="ex-tok ex-tok-op">+</span>
+        <span class="ex-mini-slot">__</span>
+        <span class="ex-tok ex-tok-paren">)</span>
+        <span class="ex-tok ex-tok-op">×</span>
+        <span class="ex-mini-slot">__</span>
+        <span class="ex-tok ex-tok-paren">)</span>
+        <span class="ex-tok ex-tok-op">−</span>
+        <span class="ex-tok ex-tok-paren">(</span>
+        <span class="ex-mini-slot">__</span>
+        <span class="ex-tok ex-tok-op">÷</span>
+        <span class="ex-mini-slot">__</span>
+        <span class="ex-tok ex-tok-paren">)</span>
+      </div>
+      <div class="ex-mini-bank" aria-label="Bank">
+        <span class="ex-mini-chip">2</span>
+        <span class="ex-mini-chip">3</span>
+        <span class="ex-mini-chip">4</span>
+        <span class="ex-mini-chip">5</span>
+        <span class="ex-mini-chip">7</span>
+        <span class="ex-mini-chip">8</span>
+        <span class="ex-mini-chip">9</span>
+      </div>
+    </section>
+
+    <div class="ex-viewport" id="ex-viewport" role="region" aria-roledescription="carousel" aria-label="Explainer slides" tabindex="0">
+      <div class="ex-track" id="ex-track">
+
+        <!-- ─────────────── Slide 1: Hero / Orientation ─────────────── -->
+        <section class="ex-slide" data-slide="1" data-tone="neutral" aria-label="Slide 1: Pipeline overview">
+          <h2 class="ex-h">Follow one puzzle from random expression to playable challenge!</h2>
+          <p class="ex-sub">Every puzzle moves through four stages on the server before you ever see it. Tap a stage to jump there.</p>
+
+          <div class="ex-pipeline" id="ex-pipeline" aria-label="Pipeline stages">
+            <button class="ex-stage" data-jump="2" data-tone="tree" aria-label="Build stage">
+              <div class="ex-stage-mini" data-stage="build">
+                <span class="ex-mini-node"></span>
+                <span class="ex-mini-edge"></span>
+                <span class="ex-mini-node"></span>
+                <span class="ex-mini-edge"></span>
+                <span class="ex-mini-node"></span>
+                <span class="ex-mini-ok">✓</span>
+              </div>
+              <div class="ex-stage-name">Build</div>
+              <div class="ex-stage-tag">expression tree</div>
+            </button>
+            <span class="ex-pipe-arrow">→</span>
+            <button class="ex-stage" data-jump="3" data-tone="prob" aria-label="Sample stage">
+              <div class="ex-stage-mini" data-stage="filter">
+                <span class="ex-mini-x">✕</span><span class="ex-mini-x">✕</span><span class="ex-mini-x">✕</span><span class="ex-mini-ok">✓</span>
+              </div>
+              <div class="ex-stage-name">Sample</div>
+              <div class="ex-stage-tag">accept / reject</div>
+            </button>
+            <span class="ex-pipe-arrow">→</span>
+            <button class="ex-stage" data-jump="4" data-tone="search" aria-label="Verify stage">
+              <div class="ex-stage-mini" data-stage="verify">
+                <span class="ex-mini-perm"></span><span class="ex-mini-perm"></span><span class="ex-mini-perm"></span>
+                <span class="ex-mini-ok">✓</span>
+              </div>
+              <div class="ex-stage-name">Verify</div>
+              <div class="ex-stage-tag">permutations</div>
+            </button>
+            <span class="ex-pipe-arrow">→</span>
+            <button class="ex-stage" data-tone="connect" data-jump="5" aria-label="Connect stage">
+              <div class="ex-stage-mini" data-stage="play">
+                <span class="ex-mini-chip">4</span><span class="ex-mini-chip">7</span><span class="ex-mini-ok">✓</span>
+              </div>
+              <div class="ex-stage-name">Connect</div>
+              <div class="ex-stage-tag">to the courses</div>
+            </button>
+          </div>
+        </section>
+
+        <!-- ─────────────── Slide 2: Expression Trees ─────────────── -->
+        <section class="ex-slide" data-slide="2" data-tone="tree" aria-label="Slide 2: Expression trees">
+          <div class="ex-row-head">
+            <h2 class="ex-h">A puzzle begins as a tree</h2>
+            <span class="ex-course-tag" data-course="cs">6.100.2x · recursion &amp; trees</span>
+          </div>
+          <p class="ex-sub">The tree builds itself top-down on arrival. <strong>Tap any node</strong> to walk its subtree post-order and reveal each running value.</p>
+
+          <div class="ex-tree-layout">
+            <div class="ex-tree-col-visual">
+              <div class="ex-tree-wrap">
+                <svg class="ex-tree-svg" id="tree-svg" viewBox="0 0 560 300" aria-label="Expression tree"></svg>
+              </div>
+            </div>
+
+            <div class="ex-tree-col-readout">
+              <div class="ex-tree-readout">
+                <div class="ex-readout-label" id="tree-readout-label">select a node to begin</div>
+                <div class="ex-readout-line">
+                  <div class="ex-readout-expr" id="tree-sub-expr"></div>
+                  <div class="ex-readout-val" id="tree-sub-val"></div>
+                </div>
+              </div>
+
+              <button class="ex-deeper" data-drawer="d2">Go deeper ▾</button>
+              <div class="ex-drawer" id="d2" hidden>
+                <p>Internal nodes are operators in {+, −, ×, ÷} and leaves are integers. Evaluation is a post-order walk: compute the left and right children, then apply the operator. Pretty-printing only adds parentheses when a child's precedence is lower than the current operator's. That's why <code>(4 + 7) × 3</code> keeps its inner parens but <code>4 + 7</code> alone would not.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ─────────────── Slide 3: Rejection Sampling ─────────────── -->
+        <section class="ex-slide" data-slide="3" data-tone="prob" aria-label="Slide 3: Rejection sampling">
+          <div class="ex-row-head">
+            <h2 class="ex-h">Most random expressions are rejected</h2>
+            <span class="ex-course-tag" data-course="prob">Probability &amp; Statistical Data Analysis · PRIMARY</span>
+          </div>
+          <p class="ex-sub">The server keeps drawing random expressions until one lands an integer result inside the target band. Each attempt is a <strong>Bernoulli trial</strong>; the number of trials before the first success follows a <strong>geometric distribution</strong> with mean&nbsp;1/p.</p>
+
+          <div class="ex-sampler">
+            <div class="ex-sampler-controls">
+              <div class="ex-control">
+                <label for="s-ops">Operators</label>
+                <select id="s-ops">
+                  <option value="add">+ only</option>
+                  <option value="addsub">+ and −</option>
+                  <option value="all" selected>+ − × ÷</option>
+                </select>
+              </div>
+              <div class="ex-control">
+                <label for="s-range">Target band</label>
+                <select id="s-range">
+                  <option value="wide" selected>10 – 99 (wide)</option>
+                  <option value="mid">20 – 60 (mid)</option>
+                  <option value="narrow">25 – 35 (narrow)</option>
+                </select>
+              </div>
+              <button id="s-run" class="ex-mini-btn ex-mini-btn-primary">Run sampler</button>
+              <p class="ex-tip">Each row is a real random expression generated client-side. Green is accepted; red shows why it failed.</p>
+            </div>
+
+            <div class="ex-sampler-out">
+              <div class="ex-stream" id="s-stream" aria-live="polite"></div>
+              <div class="ex-stats">
+                <div class="ex-stat-card">
+                  <div class="ex-stat-name">Acceptance rate <em>p</em></div>
+                  <div class="ex-stat-val" id="s-p"></div>
+                </div>
+                <div class="ex-stat-card">
+                  <div class="ex-stat-name">Expected attempts 1/<em>p</em></div>
+                  <div class="ex-stat-val" id="s-exp"></div>
+                </div>
+                <div class="ex-stat-card">
+                  <div class="ex-stat-name">P(fail in 2000) = (1−<em>p</em>)<sup>2000</sup></div>
+                  <div class="ex-stat-val" id="s-fail"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button class="ex-deeper" data-drawer="d3">Go deeper ▾</button>
+          <div class="ex-drawer" id="d3" hidden>
+            <p><strong>Why the (1−p)<sup>2000</sup> matters.</strong> ARITHMIX caps generation at 2000 attempts per request. For the wide band with all four operators, p stays high enough that the cap is effectively never reached. Tighten the band above to <strong>25 – 35 (narrow)</strong> with all four operators and acceptance drops to p ≈ <strong id="d3-narrow-p"></strong>. Expected wait climbs to <strong id="d3-narrow-exp"></strong> attempts and (1−p)<sup>2000</sup> = <strong id="d3-narrow-fail"></strong>. The difficulty configs in <code>puzzles.py</code> stay on the safe side of that curve.</p>
+          </div>
+        </section>
+
+        <!-- ─────────────── Slide 4: Permutation Verification ─────────────── -->
+        <section class="ex-slide" data-slide="4" data-tone="search" aria-label="Slide 4: Permutation verification">
+          <div class="ex-row-head">
+            <h2 class="ex-h">Can the number bank actually solve the puzzle?</h2>
+            <span class="ex-course-tag" data-course="prob">Probability &amp; Statistical Data Analysis · PRIMARY</span>
+          </div>
+          <p class="ex-sub">Each verification step is the same routine: <strong>pick</strong> five distinct chips from the seven-chip bank in a chosen order, <strong>drop</strong> them into the slots, <strong>evaluate</strong> the expression, and <strong>compare</strong> against the target. A miss advances to the next arrangement; a hit stops the search.</p>
+
+          <div class="ex-perm">
+            <div class="ex-perm-board" aria-label="Template with slots">
+              <span class="ex-paren">(</span><span class="ex-paren">(</span>
+              <span class="ex-pslot" data-slot="0">__</span>
+              <span class="ex-op">+</span>
+              <span class="ex-pslot" data-slot="1">__</span>
+              <span class="ex-paren">)</span>
+              <span class="ex-op">×</span>
+              <span class="ex-pslot" data-slot="2">__</span>
+              <span class="ex-paren">)</span>
+              <span class="ex-op">−</span>
+              <span class="ex-paren">(</span>
+              <span class="ex-pslot" data-slot="3">__</span>
+              <span class="ex-op">÷</span>
+              <span class="ex-pslot" data-slot="4">__</span>
+              <span class="ex-paren">)</span>
+              <span class="ex-eq">=</span>
+              <span class="ex-result" id="p-result"></span>
+              <span class="ex-result-check" id="p-match" aria-hidden="true">✓</span>
+            </div>
+
+            <div class="ex-perm-controls">
+              <button id="p-step" class="ex-mini-btn">Step</button>
+              <button id="p-auto" class="ex-mini-btn ex-mini-btn-primary">Autoplay</button>
+              <button id="p-reset" class="ex-mini-btn">Reset</button>
+              <div class="ex-counter-card">
+                <span id="p-count">0</span> / <span id="p-total">2520</span> checked
+              </div>
+            </div>
+
+            <div class="ex-formula-card">
+              <div class="ex-formula-label">Permutations of 5 from a bank of 7</div>
+              <div class="ex-formula">P(7, 5) = 7 × 6 × 5 × 4 × 3 = <strong>2520</strong></div>
+              <div class="ex-formula-label" style="margin-top:8px">Expected checks until a solution</div>
+              <div class="ex-formula"><strong id="p-solutions"></strong> arrangements solve this puzzle &nbsp;→&nbsp; expect ≈ <strong id="p-expected"></strong> checks</div>
+            </div>
+          </div>
+
+          <button class="ex-deeper" data-drawer="d4">Go deeper ▾</button>
+          <div class="ex-drawer" id="d4" hidden>
+            <p>Search stops at the first arrangement that hits the target, so verification cost depends on how many solutions <em>S</em> the puzzle has. If <em>S</em> successes are uniformly distributed across <em>N</em> = 2520 arrangements, the expected position of the first hit is <em>E</em> = (<em>N</em> + 1) / (<em>S</em> + 1). A puzzle with many solutions resolves in a few hundred steps; a sparse puzzle (<em>S</em> = 1) climbs to ≈ 1260. That's why permutation verification stays cheap on the server: most puzzles short‑circuit long before scanning all 2520.</p>
+          </div>
+        </section>
+
+        <!-- ─────────────── Slide 5: MIT Learn connections ─────────────── -->
+        <section class="ex-slide" data-slide="5" data-tone="neutral" aria-label="Slide 5: MIT Learn connections">
+          <h2 class="ex-h">Go further with MIT courses!</h2>
+
+          <div class="ex-courses">
+            <article class="ex-course-card ex-course-primary">
+              <div class="ex-course-flag">PRIMARY</div>
+              <h3>Probability and Statistical Data Analysis</h3>
+              <p class="ex-course-blurb">The math behind why some puzzles are easy to generate and others almost impossible.</p>
+              <ul>
+                <li>Bernoulli trials</li>
+                <li>Geometric distribution</li>
+                <li>Expected value</li>
+                <li>Permutations and counting</li>
+              </ul>
+              <a href="#" class="ex-course-cta" data-cta="primary">Explore the course →</a>
+            </article>
+
+            <article class="ex-course-card ex-course-secondary">
+              <div class="ex-course-flag">SECONDARY · active on MITx</div>
+              <h3>6.100.2x: Introduction to Computational Thinking and Data Science</h3>
+              <p class="ex-course-blurb">The data structures and algorithms that turn the math into running code.</p>
+              <ul>
+                <li>Recursion &amp; trees</li>
+                <li>Simulation &amp; sampling</li>
+                <li>Search</li>
+                <li>Operator precedence &amp; parsing</li>
+              </ul>
+              <a href="#" class="ex-course-cta" data-cta="secondary">Explore the course →</a>
+            </article>
+          </div>
+
+          <div class="ex-concepts">
+            <div class="ex-readout-label">Jump back to a concept</div>
+            <div class="ex-chip-row">
+              <button class="ex-concept-chip" data-jump="2" data-highlight="tree">Trees</button>
+              <button class="ex-concept-chip" data-jump="2" data-highlight="recursion">Recursion</button>
+              <button class="ex-concept-chip" data-jump="3" data-highlight="rejection">Rejection sampling</button>
+              <button class="ex-concept-chip" data-jump="3" data-highlight="geometric">Geometric distribution</button>
+              <button class="ex-concept-chip" data-jump="4" data-highlight="perms">Permutations</button>
+            </div>
+          </div>
+
+          <div class="ex-final-cta">
+            <a class="ex-cta ex-cta-primary" href="https://learn.mit.edu" target="_blank" rel="noopener">Explore Courses</a>
+            <a class="ex-cta ex-cta-secondary" href="/">Play ARITHMIX →</a>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <nav class="ex-nav" aria-label="Slide controls">
+      <button id="ex-prev" class="ex-nav-btn">← Prev</button>
+      <div class="ex-dots" id="ex-dots" role="tablist" aria-label="Slide indicators"></div>
+      <button id="ex-next" class="ex-nav-btn ex-nav-btn-primary">Next →</button>
+    </nav>
+
+  </div>
+  <script src="/static/explainer.js?v=2"></script>
+</body>
+</html>

@@ -388,6 +388,46 @@ body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
   box-shadow: 0 0 0 3px rgba(163, 31, 52, 0.30);
 }
 
+/* Explainer button — shown on the homescreen only, between the
+   "Select a mode to begin" template-area and the home lightboard.
+   Sized like .mode-btn but with black outline + white fill so it reads
+   as a secondary action. Text matches the slide-1 "Inside ARITHMIX"
+   styling (Fredoka One, ink "Inside", MIT-red "ARITHMIX"). */
+.explainer-link-row {
+  display: none;
+  text-align: center;
+  margin: 16px 0;
+}
+body.menu-mode .explainer-link-row { display: block; }
+
+/* The empty .result line creates dead space between the template-area and
+   the button on the menu — hide it so the button can sit centered. */
+body.menu-mode #result { display: none; }
+
+/* The template-area's default 30px bottom margin is for gameplay spacing
+   above the bank; on the menu it just inflates the gap above the button.
+   Let the button's own margin set the gap on both sides. */
+body.menu-mode #template-area { margin-bottom: 0; }
+
+.explainer-link {
+  display: inline-block;
+  padding: clamp(10px, 1.1vw, 16px) clamp(20px, 2.4vw, 36px);
+  border: 2px solid #fff;
+  border-radius: 8px;
+  background: #dde1e6;
+  font-family: 'Fredoka One', system-ui, sans-serif;
+  font-size: clamp(16px, 1.4vw, 22px);
+  letter-spacing: 0.5px;
+  color: #000;
+  text-decoration: none;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 150ms, transform 100ms;
+}
+.explainer-link span { color: #750014; }
+/* .explainer-link:hover { background: #f2f4f8; } */
+.explainer-link:active { transform: translateY(1px); }
+
 /* Rush Stats */
 .rush-stats {
   display: flex;
@@ -621,6 +661,9 @@ body.dragging .bank-item:not(.snap-clone):not(.drag-clone) {
   }
   body.menu-mode .lightboard-section {
     margin-top: 10px;
+  }
+  .explainer-link-row {
+    margin: 10px 0;
   }
 
   .mode-selector {

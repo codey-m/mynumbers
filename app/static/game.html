@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>ARITHMIX</title>
-  <link rel="stylesheet" href="styles.css?v=54" />
+  <link rel="stylesheet" href="/static/styles.css?v=54" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Fredoka+One&family=Patrick+Hand&family=Architects+Daughter&family=Kalam:wght@400;700&display=swap" rel="stylesheet">
 </head>
@@ -298,6 +298,11 @@
 
     <div id="result" class="result" role="status"></div>
 
+    <!-- Explainer entry-point (menu only) — sits between "Select a mode to begin" and the lightboard -->
+    <div class="explainer-link-row" id="explainerLinkRow">
+      <a href="/explainer" class="explainer-link">Inside <span>ARITHMIX</span></a>
+    </div>
+
     <!-- Home lightboard (visible on menu only) -->
     <div id="home-lightboard-section" class="lightboard-section" style="display:none;">
       <img class="lightboard-tim" src="/static/images/Tim_three-quarter-full-RGB.svg" alt="Tim" />
@@ -357,6 +362,6 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="game.js?v=46"></script>
+  <script src="/static/game.js?v=46"></script>
 </body>
 </html>

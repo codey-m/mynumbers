@@ -83,22 +83,23 @@ DIFFICULTY_CONFIGS = {
         "min_parens": 1, "max_parens": 1,
         "max_muls": 1,  "max_divs": 0,
     },
-    # ── Multiple * with parentheses ───────────────────────────────────────────
-    7: {
-        "ops": ["+", "-", "*"],
-        "min_leaf": 2, "max_leaf": 12,
-        "target_min": 45, "target_max": 70,
-        "min_parens": 1, "max_parens": 2,
-        "max_muls": None, "max_divs": 0,
-    },
     # ── Single / introduced, shallow (no nesting around it) ──────────────────
-    8: {
+    7: {
         "ops": ["+", "-", "*", "/"],
         "min_leaf": 2, "max_leaf": 12,
         "target_min": 50, "target_max": 75,
         "min_parens": 0, "max_parens": 1,
         "max_muls": 1,  "max_divs": 1,
     },
+    # ── Multiple * with parentheses ───────────────────────────────────────────
+    8: {
+        "ops": ["+", "-", "*"],
+        "min_leaf": 2, "max_leaf": 12,
+        "target_min": 45, "target_max": 70,
+        "min_parens": 1, "max_parens": 2,
+        "max_muls": None, "max_divs": 0,
+    },
+    
     # ── Multiple /, limited nesting ───────────────────────────────────────────
     9: {
         "ops": ["+", "-", "*", "/"],
