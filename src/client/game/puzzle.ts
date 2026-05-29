@@ -13,6 +13,7 @@ import {
 import { updateControls, addEquationToLightboard, playWrongFillAnimation } from './lightboard';
 import { calculateDifficulty, updateRushUI, startCountdown } from './rush';
 import { cancelActiveDrag, handleDropOnSlot, pointerDownHandler, animateSnapAndPlace } from './drag';
+import { puzzleRush, puzzleCheck } from './puzzles';
 
 // ============================================================================
 // SCROLL LOCK (iOS)
@@ -45,46 +46,47 @@ export function unlockPageScroll(): void {
 
 export function newPuzzle(): void {
   cancelActiveDrag();
-  let endpoint = "/api/puzzle/rush?difficulty=3&decoys=2";
 
+  let difficulty = 3;
   if (gameMode === "rush3" || gameMode === "rush5") {
     setCurrentDifficulty(calculateDifficulty(puzzlesSolved));
     if (currentDifficulty > maxDifficultyReached) setMaxDifficultyReached(currentDifficulty);
-    endpoint = `/api/puzzle/rush?difficulty=${currentDifficulty}&decoys=2`;
+    difficulty = currentDifficulty;
   }
 
-  fetch(endpoint)
-    .then((r) => r.json())
-    .then((data: Puzzle) => {
-      setPuzzle(data);
-      renderTemplate(data.template_tokens);
-      renderBank(data.numbers);
+  let data: Puzzle;
+  try {
+    data = puzzleRush({ difficulty, decoys: 2 }) as Puzzle;
+  } catch (e) {
+    console.error("Generate puzzle error", e);
+    const resultEl = document.getElementById("result");
+    if (resultEl) resultEl.textContent = "Failed to generate puzzle.";
+    return;
+  }
 
-      const resultEl = document.getElementById("result");
-      if (resultEl) resultEl.textContent = "";
+  setPuzzle(data);
+  renderTemplate(data.template_tokens);
+  renderBank(data.numbers);
 
-      updateControls();
+  const resultEl = document.getElementById("result");
+  if (resultEl) resultEl.textContent = "";
 
-      if (gameMode === "rush3" || gameMode === "rush5") {
-        updateRushUI();
-        if (!rushStarted) {
-          if (skipIntroAnimation) {
-            setSkipIntroAnimation(false);
-            startCountdown();
-          } else {
-            playWrongFillAnimation();
-          }
-        }
+  updateControls();
+
+  if (gameMode === "rush3" || gameMode === "rush5") {
+    updateRushUI();
+    if (!rushStarted) {
+      if (skipIntroAnimation) {
+        setSkipIntroAnimation(false);
+        startCountdown();
       } else {
-        const targetEl = document.getElementById("target");
-        if (targetEl) targetEl.textContent = String(data.target);
+        playWrongFillAnimation();
       }
-    })
-    .catch((e) => {
-      console.error("Fetch puzzle error", e);
-      const resultEl = document.getElementById("result");
-      if (resultEl) resultEl.textContent = "Failed to fetch puzzle.";
-    });
+    }
+  } else {
+    const targetEl = document.getElementById("target");
+    if (targetEl) targetEl.textContent = String(data.target);
+  }
 }
 
 export function renderTemplate(tokens: string[]): void {
@@ -273,59 +275,46 @@ export function checkPuzzle(): void {
     .replace(/\*/g, "×")
     .replace(/\//g, "÷");
 
-  const payload = {
+  const data = puzzleCheck({
     numbers: puzzle!.numbers,
-    expression: built.expression,
+    expression: built.expression!,
     target: puzzle!.target,
-  };
+  });
 
-  fetch("/api/puzzle/check", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  })
-    .then((r) => r.json())
-    .then((data: any) => {
-      const evalDisplay = data.evaluated_display || String(data.evaluated);
+  const evalDisplay = data.evaluated_display || String(data.evaluated);
 
-      if (data.reason === "invalid_expression") {
-        resultEl.textContent = `Invalid: ${data.message || "expression invalid"}`;
-        resultEl.className = "result error";
-        return;
-      }
+  if (data.reason === "invalid_expression") {
+    resultEl.textContent = `Invalid: ${data.message || "expression invalid"}`;
+    resultEl.className = "result error";
+    return;
+  }
 
-      if (data.reason === "correct") {
-        if (gameMode === "rush3" || gameMode === "rush5") {
-          setPuzzlesSolved(puzzlesSolved + 1);
-          addEquationToLightboard(`${displayExpr} = ${puzzle!.target}`);
+  if (data.reason === "correct") {
+    if (gameMode === "rush3" || gameMode === "rush5") {
+      setPuzzlesSolved(puzzlesSolved + 1);
+      addEquationToLightboard(`${displayExpr} = ${puzzle!.target}`);
 
-          resultEl.textContent = `Correct! Level ${puzzlesSolved + 1}`;
-          resultEl.className = "result success";
+      resultEl.textContent = `Correct! Level ${puzzlesSolved + 1}`;
+      resultEl.className = "result success";
 
-          setTimeout(() => {
-            newPuzzle();
-          }, 600);
-        } else {
-          resultEl.textContent = `Correct! ${displayExpr} = ${evalDisplay}`;
-          resultEl.className = "result success";
-        }
-        return;
-      }
+      setTimeout(() => {
+        newPuzzle();
+      }, 600);
+    } else {
+      resultEl.textContent = `Correct! ${displayExpr} = ${evalDisplay}`;
+      resultEl.className = "result success";
+    }
+    return;
+  }
 
-      if (data.reason === "wrong_value") {
-        resultEl.textContent = `Incorrect. Got ${evalDisplay}, need ${puzzle!.target}`;
-        resultEl.className = "result error";
-        return;
-      }
+  if (data.reason === "wrong_value") {
+    resultEl.textContent = `Incorrect. Got ${evalDisplay}, need ${puzzle!.target}`;
+    resultEl.className = "result error";
+    return;
+  }
 
-      resultEl.textContent = `Result: ${evalDisplay}`;
-      resultEl.className = "result";
-    })
-    .catch((err) => {
-      console.error(err);
-      resultEl.textContent = "Error checking expression.";
-      resultEl.className = "result error";
-    });
+  resultEl.textContent = `Result: ${evalDisplay}`;
+  resultEl.className = "result";
 }
 
 export function canCheck(): boolean {
