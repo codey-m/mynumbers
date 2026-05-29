@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react"
+import { Link } from "react-router-dom"
 import { useGameState, useGameDispatch } from "./context/GameContext"
 import { Logo } from "./components/Logo"
 import { ModeSelector } from "./components/ModeSelector"
@@ -29,6 +30,15 @@ export function App() {
 
   const isRush = state.mode === "rush3" || state.mode === "rush5"
   const prevSlotValuesRef = useRef(state.slotValues)
+
+  // Toggle body.menu-mode for CSS that targets it
+  useEffect(() => {
+    if (state.showMenu) {
+      document.body.classList.add("menu-mode")
+    } else {
+      document.body.classList.remove("menu-mode")
+    }
+  }, [state.showMenu])
 
   // Generate puzzle when mode starts
   const hasGenerated = useRef(false)
@@ -82,9 +92,9 @@ export function App() {
           </p>
         </div>
         <div className="explainer-link-row">
-          <a href="/explainer" className="explainer-link">
+          <Link to="/explainer" className="explainer-link">
             Inside <span>ARITHMIX</span>
-          </a>
+          </Link>
         </div>
         <HomeLightboard />
       </div>

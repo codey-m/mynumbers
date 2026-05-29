@@ -3,8 +3,7 @@ const path = require('path');
 module.exports = {
   mode: 'production',
   entry: {
-    game: './src/client/game/index.tsx',
-    explainer: './src/client/explainer/index.ts',
+    app: './src/client/game/index.tsx',
   },
   output: {
     filename: '[name].bundle.js',

@@ -12,13 +12,9 @@ app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok' })
 })
 
-// HTML entry points
-app.get('/', (_req: Request, res: Response) => {
+// SPA — serve game.html for all client routes
+app.get('*', (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, '..', '..', 'app', 'static', 'game.html'))
-})
-
-app.get('/explainer', (_req: Request, res: Response) => {
-  res.sendFile(path.join(__dirname, '..', '..', 'app', 'static', 'explainer.html'))
 })
 
 app.listen(PORT, () => {
