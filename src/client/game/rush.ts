@@ -2,43 +2,54 @@
 // RUSH MODE UTILITIES
 // ============================================================================
 
-function calculateDifficulty(solved) {
-  if (solved <= 1)  return 1;  // puzzle 1
-  if (solved <= 2)  return 2;  // puzzle 2
-  if (solved <= 4)  return 3;  // puzzles 3–4
-  if (solved <= 6)  return 4;  // puzzles 5–6
-  if (solved <= 8)  return 5;  // puzzles 7–8
-  if (solved <= 10) return 6;  // puzzles 9–10
-  if (solved <= 12) return 7;  // puzzles 11–12
-  if (solved <= 13) return 8;  // puzzle 13
-  if (solved <= 14) return 9;  // puzzle 14
-  if (solved <= 15) return 10; // puzzle 15
-  if (solved <= 16) return 11; // rare
-  return 12;                   // exceptional
+import {
+  puzzle, gameMode, rushTimer, timeRemaining, puzzlesSolved,
+  currentDifficulty, maxDifficultyReached, rushIntroPlaying,
+  skipIntroAnimation, rushStarted, currentShareBlob, currentShareBlobURL,
+  GAME_URL, LIGHTBOARD_COLORS,
+  setPuzzle, setGameMode, setRushTimer, setTimeRemaining,
+  setPuzzlesSolved, setCurrentDifficulty, setMaxDifficultyReached,
+  setRushIntroPlaying, setSkipIntroAnimation, setRushStarted,
+  setCurrentShareBlob, setCurrentShareBlobURL,
+} from './state';
+import { clearLightboard, addEquationToLightboard, updateControls, playWrongFillAnimation } from './lightboard';
+import { showHomeLightboard, hideHomeLightboard } from './home-lightboard';
+import { newPuzzle } from './puzzle';
+
+export function calculateDifficulty(solved: number): number {
+  if (solved <= 1) return 1;
+  if (solved <= 2) return 2;
+  if (solved <= 4) return 3;
+  if (solved <= 6) return 4;
+  if (solved <= 8) return 5;
+  if (solved <= 10) return 6;
+  if (solved <= 12) return 7;
+  if (solved <= 13) return 8;
+  if (solved <= 14) return 9;
+  if (solved <= 15) return 10;
+  if (solved <= 16) return 11;
+  return 12;
 }
 
-function setBankAreaVisible(visible) {
+function setBankAreaVisible(visible: boolean): void {
   const el = document.getElementById("bankArea");
   if (!el) return;
   el.style.display = visible ? "" : "none";
 }
 
-function showMenu() {
-  // Mark this shared-route entry as menu state. Idempotent — only writes
-  // when the marker isn't already correct, so refresh / repeated calls
-  // don't churn the history stack.
+export function showMenu(): void {
   if (history.state?.arithmix !== "menu") {
     history.replaceState({ arithmix: "menu" }, "", "/");
   }
 
-  window.logoCycle?.startAccentCycle();
+  (window as any).logoCycle?.startAccentCycle();
 
-  gameMode = null;
+  setGameMode(null);
   setBankAreaVisible(false);
 
   if (rushTimer) {
     clearInterval(rushTimer);
-    rushTimer = null;
+    setRushTimer(null);
   }
 
   hideModal();
@@ -47,99 +58,95 @@ function showMenu() {
   if (menuBtn) menuBtn.style.display = "none";
 
   document.body.classList.add("menu-mode");
-  document.getElementById("mode-selector").style.display = "flex";
-  document.getElementById("rush-stats").style.display = "none";
-  document.getElementById("practice-stats").style.display = "none";
-  document.getElementById("how-to-play").style.display = "none";
-  document.getElementById("rush-ready-modal").style.display = "none";
-  document.getElementById("lightboard-section").style.display = "none";
+  document.getElementById("mode-selector")!.style.display = "flex";
+  document.getElementById("rush-stats")!.style.display = "none";
+  document.getElementById("practice-stats")!.style.display = "none";
+  document.getElementById("how-to-play")!.style.display = "none";
+  document.getElementById("rush-ready-modal")!.style.display = "none";
+  document.getElementById("lightboard-section")!.style.display = "none";
   showHomeLightboard();
 
-  document.getElementById("template-area").innerHTML =
+  document.getElementById("template-area")!.innerHTML =
     '<p style="text-align:center;color:#999;padding:20px;">Select a mode to begin</p>';
-  document.getElementById("bank").innerHTML = "";
-  document.getElementById("result").textContent = "";
+  document.getElementById("bank")!.innerHTML = "";
+  document.getElementById("result")!.textContent = "";
 
-  document.getElementById("menuBtn").style.display = "none";
-  document.getElementById("resetBtn").style.display = "none";
-  document.getElementById("newBtn").style.display = "none";
-  document.getElementById("endRushBtn").style.display = "none";
+  document.getElementById("menuBtn")!.style.display = "none";
+  document.getElementById("resetBtn")!.style.display = "none";
+  document.getElementById("newBtn")!.style.display = "none";
+  document.getElementById("endRushBtn")!.style.display = "none";
 
-  puzzle = null;
+  setPuzzle(null);
 }
 
-function startPracticeMode() {
-  // Mark this shared-route entry as game state. If the user clicks Inside
-  // ARITHMIX from here, the Inside-link handler overwrites this back to
-  // 'menu' so the entry behind /explainer always represents menu.
+export function startPracticeMode(): void {
   history.replaceState({ arithmix: "game" }, "", "/");
 
-  window.logoCycle?.stopAccentCycle();
+  (window as any).logoCycle?.stopAccentCycle();
 
-  gameMode = "practice";
+  setGameMode("practice");
   document.body.classList.remove("menu-mode");
   hideModal();
   hideHomeLightboard();
   setBankAreaVisible(true);
 
-  document.getElementById("mode-selector").style.display = "none";
-  document.getElementById("rush-stats").style.display = "none";
-  document.getElementById("practice-stats").style.display = "flex";
-  document.getElementById("how-to-play").style.display = "block";
-  document.getElementById("lightboard-section").style.display = "none";
+  document.getElementById("mode-selector")!.style.display = "none";
+  document.getElementById("rush-stats")!.style.display = "none";
+  document.getElementById("practice-stats")!.style.display = "flex";
+  document.getElementById("how-to-play")!.style.display = "block";
+  document.getElementById("lightboard-section")!.style.display = "none";
 
-  document.getElementById("resetBtn").style.display = "inline-block";
-  document.getElementById("newBtn").style.display = "inline-block";
-  document.getElementById("menuBtn").style.display = "inline-block";
-  document.getElementById("endRushBtn").style.display = "none";
+  document.getElementById("resetBtn")!.style.display = "inline-block";
+  document.getElementById("newBtn")!.style.display = "inline-block";
+  document.getElementById("menuBtn")!.style.display = "inline-block";
+  document.getElementById("endRushBtn")!.style.display = "none";
 
   newPuzzle();
 }
 
-function startRushMode(minutes, skipIntro = false) {
-  // See note in startPracticeMode() — same state-marker policy.
+export function startRushMode(minutes: number, skipIntro = false): void {
   history.replaceState({ arithmix: "game" }, "", "/");
 
-  skipIntroAnimation = skipIntro;
-  window.logoCycle?.stopAccentCycle();
+  setSkipIntroAnimation(skipIntro);
+  (window as any).logoCycle?.stopAccentCycle();
 
-  gameMode = minutes === 3 ? "rush3" : "rush5";
+  setGameMode(minutes === 3 ? "rush3" : "rush5");
   document.body.classList.remove("menu-mode");
   hideHomeLightboard();
 
   const menuBtn = document.getElementById("menuBtn");
   if (menuBtn) menuBtn.style.display = "none";
 
-  puzzlesSolved = 0;
-  currentDifficulty = 1;
-  maxDifficultyReached = 1;
-  timeRemaining = minutes * 60;
+  setPuzzlesSolved(0);
+  setCurrentDifficulty(1);
+  setMaxDifficultyReached(1);
+  setTimeRemaining(minutes * 60);
   updateTimerDisplay();
-  rushStarted = false;
+  setRushStarted(false);
 
   hideModal();
   setBankAreaVisible(true);
-  document.getElementById("mode-selector").style.display = "none";
-  document.getElementById("rush-stats").style.display = "flex";
-  document.getElementById("practice-stats").style.display = "none";
-  document.getElementById("how-to-play").style.display = "none";
-  document.getElementById("resetBtn").style.display = "inline-block";
-  document.getElementById("endRushBtn").style.display = "inline-block";
-  document.getElementById("newBtn").style.display = "none";
+  document.getElementById("mode-selector")!.style.display = "none";
+  document.getElementById("rush-stats")!.style.display = "flex";
+  document.getElementById("practice-stats")!.style.display = "none";
+  document.getElementById("how-to-play")!.style.display = "none";
+  document.getElementById("resetBtn")!.style.display = "inline-block";
+  document.getElementById("endRushBtn")!.style.display = "inline-block";
+  document.getElementById("newBtn")!.style.display = "none";
 
   clearLightboard();
-  document.getElementById("lightboard-section").style.display = "block";
+  document.getElementById("lightboard-section")!.style.display = "block";
 
   updateRushUI();
   newPuzzle();
 }
 
-function startCountdown() {
+export function startCountdown(): void {
   const overlay = document.getElementById("countdown-overlay");
   const numEl = document.getElementById("countdown-number");
   if (!overlay || !numEl) {
-    rushStarted = true;
-    rushIntroPlaying = false;
+    setRushStarted(true);
+    setRushIntroPlaying(false);
     startTimer();
     return;
   }
@@ -148,21 +155,21 @@ function startCountdown() {
   overlay.style.display = "flex";
 
   function tick() {
-    numEl.textContent = count;
-    numEl.style.animation = "none";
-    numEl.offsetWidth; // reflow to restart animation
-    numEl.style.animation = "";
+    numEl!.textContent = String(count);
+    numEl!.style.animation = "none";
+    (numEl as HTMLElement).offsetWidth; // reflow
+    numEl!.style.animation = "";
 
     if (count === 1) {
       setTimeout(() => {
-        numEl.textContent = "GO!";
-        numEl.style.animation = "none";
-        numEl.offsetWidth;
-        numEl.style.animation = "";
+        numEl!.textContent = "GO!";
+        numEl!.style.animation = "none";
+        (numEl as HTMLElement).offsetWidth;
+        numEl!.style.animation = "";
         setTimeout(() => {
-          overlay.style.display = "none";
-          rushStarted = true;
-          rushIntroPlaying = false;
+          overlay!.style.display = "none";
+          setRushStarted(true);
+          setRushIntroPlaying(false);
           startTimer();
         }, 700);
       }, 750);
@@ -174,18 +181,18 @@ function startCountdown() {
   tick();
 }
 
-function startTimer() {
+export function startTimer(): void {
   if (rushTimer) clearInterval(rushTimer);
 
-  rushTimer = setInterval(() => {
-    timeRemaining -= 1;
+  setRushTimer(setInterval(() => {
+    setTimeRemaining(timeRemaining - 1);
     updateTimerDisplay();
 
-    if (timeRemaining <= 0) endRushMode();
-  }, 1000);
+    if (timeRemaining <= 1) endRushMode();
+  }, 1000));
 }
 
-function updateTimerDisplay() {
+export function updateTimerDisplay(): void {
   const mins = Math.floor(timeRemaining / 60);
   const secs = timeRemaining % 60;
   const timerEl = document.getElementById("timer");
@@ -193,13 +200,12 @@ function updateTimerDisplay() {
 
   timerEl.textContent = `${mins}:${secs.toString().padStart(2, "0")}`;
 
-  // Visual warning colors
   if (timeRemaining <= 10) timerEl.style.color = "#dc2626";
   else if (timeRemaining <= 30) timerEl.style.color = "#f59e0b";
   else timerEl.style.color = "#ffffff";
 }
 
-function updateRushUI() {
+export function updateRushUI(): void {
   const diffEl = document.getElementById("difficulty-level");
   if (diffEl) diffEl.textContent = String(puzzlesSolved + 1);
 
@@ -207,48 +213,45 @@ function updateRushUI() {
   if (targetEl) targetEl.textContent = puzzle ? String(puzzle.target) : "—";
 }
 
-async function captureShareBlob() {
+export async function captureShareBlob(): Promise<Blob | null> {
   const board = document.getElementById("lightboard");
   if (!board) return null;
 
   const scale = 2;
   const boardRect = board.getBoundingClientRect();
-  const w = Math.round(boardRect.width  * scale);
+  const w = Math.round(boardRect.width * scale);
   const h = Math.round(boardRect.height * scale);
 
   const out = document.createElement("canvas");
-  out.width  = w;
+  out.width = w;
   out.height = h;
-  const ctx  = out.getContext("2d");
+  const ctx = out.getContext("2d")!;
 
-  // 0. White base — matches the container the board sits on in-game (board itself is transparent)
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, w, h);
 
-  // 1. Tim — fetch via blob URL to avoid SVG naturalWidth=0 canvas restriction
-  const timImgEl = board.parentElement.querySelector(".lightboard-tim");
+  const timImgEl = board.parentElement?.querySelector<HTMLImageElement>(".lightboard-tim");
   if (timImgEl) {
     try {
       const resp = await fetch(timImgEl.src);
       const blob = await resp.blob();
       const blobUrl = URL.createObjectURL(blob);
-      await new Promise((res, rej) => {
+      await new Promise<void>((res) => {
         const img = new Image();
         img.onload = () => {
-          const tr  = timImgEl.getBoundingClientRect();
-          const dx  = (tr.left - boardRect.left) * scale;
-          const dy  = (tr.top  - boardRect.top)  * scale;
-          const dw  = tr.width  * scale;
-          const dh  = tr.height * scale;
-          // Replicate object-fit:cover object-position:right center
-          const nw = img.naturalWidth  || 2189.7706;
+          const tr = timImgEl.getBoundingClientRect();
+          const dx = (tr.left - boardRect.left) * scale;
+          const dy = (tr.top - boardRect.top) * scale;
+          const dw = tr.width * scale;
+          const dh = tr.height * scale;
+          const nw = img.naturalWidth || 2189.7706;
           const nh = img.naturalHeight || 547.0416;
           const coverScale = tr.height / nh;
           const srcW = tr.width / coverScale;
           const srcX = nw - srcW;
           ctx.save();
           ctx.globalAlpha = 0.85;
-          try { ctx.filter = "brightness(0.88) saturate(0.9)"; } catch(_) {}
+          try { (ctx as any).filter = "brightness(0.88) saturate(0.9)"; } catch (_) {}
           ctx.drawImage(img, srcX, 0, srcW, nh, dx, dy, dw, dh);
           ctx.restore();
           URL.revokeObjectURL(blobUrl);
@@ -257,50 +260,47 @@ async function captureShareBlob() {
         img.onerror = () => { URL.revokeObjectURL(blobUrl); res(); };
         img.src = blobUrl;
       });
-    } catch(_) {}
+    } catch (_) {}
   }
 
-  // 2. Board gradient scrim — mirrors CSS ::before background
   const grad = ctx.createLinearGradient(0, 0, w, 0);
-  grad.addColorStop(0,    "rgba(0, 0, 0, 0.78)");
+  grad.addColorStop(0, "rgba(0, 0, 0, 0.78)");
   grad.addColorStop(0.55, "rgba(0, 0, 0, 0.78)");
-  grad.addColorStop(1,    "rgba(18, 18, 48, 0.58)");
+  grad.addColorStop(1, "rgba(18, 18, 48, 0.58)");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, w, h);
 
-  // 2b. Vignette — mirrors CSS ::before inset box-shadow: 0 0 250px rgba(0,5,40,0.35)
   const vig = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.75);
   vig.addColorStop(0, "rgba(0,5,40,0)");
   vig.addColorStop(1, "rgba(0,5,40,0.35)");
   ctx.fillStyle = vig;
   ctx.fillRect(0, 0, w, h);
 
-  // 3. Equations — ensure font loaded before drawing
-  try { await document.fonts.load(`600 34px Caveat`); } catch(_) {}
+  try { await document.fonts.load(`600 34px Caveat`); } catch (_) {}
 
   const surface = document.getElementById("lightboard-surface");
   if (surface) {
     ctx.textBaseline = "top";
-    surface.querySelectorAll(".lightboard-eq").forEach(el => {
-      const leftPct  = parseFloat(el.style.left) / 100;
-      const topPct   = parseFloat(el.style.top)  / 100;
-      const x        = leftPct * w;
-      const y        = topPct  * h;
+    surface.querySelectorAll<HTMLElement>(".lightboard-eq").forEach(el => {
+      const leftPct = parseFloat(el.style.left) / 100;
+      const topPct = parseFloat(el.style.top) / 100;
+      const x = leftPct * w;
+      const y = topPct * h;
       const fontSize = parseFloat(window.getComputedStyle(el).fontSize) * scale;
-      const color    = el.style.color || "#fff";
+      const color = el.style.color || "#fff";
       const glowMatch = (el.style.textShadow || "").match(/rgba?\([^)]+\)/);
-      const glow     = glowMatch ? glowMatch[0] : color;
+      const glow = glowMatch ? glowMatch[0] : color;
 
       ctx.save();
-      ctx.font      = `600 ${fontSize}px Caveat, cursive`;
+      ctx.font = `600 ${fontSize}px Caveat, cursive`;
       ctx.fillStyle = color;
       ctx.shadowColor = glow;
-      ctx.shadowBlur  = 22 * scale;
-      ctx.fillText(el.textContent, x, y);
-      ctx.shadowBlur  = 10 * scale;
-      ctx.fillText(el.textContent, x, y);
-      ctx.shadowBlur  = 0;
-      ctx.fillText(el.textContent, x, y);
+      ctx.shadowBlur = 22 * scale;
+      ctx.fillText(el.textContent!, x, y);
+      ctx.shadowBlur = 10 * scale;
+      ctx.fillText(el.textContent!, x, y);
+      ctx.shadowBlur = 0;
+      ctx.fillText(el.textContent!, x, y);
       ctx.restore();
     });
   }
@@ -308,31 +308,30 @@ async function captureShareBlob() {
   return new Promise(resolve => out.toBlob(blob => resolve(blob), "image/png"));
 }
 
-async function endRushMode() {
+export async function endRushMode(): Promise<void> {
   if (rushTimer) {
     clearInterval(rushTimer);
-    rushTimer = null;
+    setRushTimer(null);
   }
 
-  document.getElementById("rush-ready-modal").style.display = "none";
-  rushIntroPlaying = false;
+  document.getElementById("rush-ready-modal")!.style.display = "none";
+  setRushIntroPlaying(false);
 
-  // Capture lightboard WITH Tim visible, before hiding him
   if (currentShareBlobURL) {
     URL.revokeObjectURL(currentShareBlobURL);
-    currentShareBlobURL = null;
+    setCurrentShareBlobURL(null);
   }
-  currentShareBlob = null;
+  setCurrentShareBlob(null);
   try {
-    currentShareBlob = await captureShareBlob();
+    setCurrentShareBlob(await captureShareBlob());
   } catch { /* ignore */ }
 
-  document.getElementById("lightboard-section").querySelector(".lightboard-tim").style.display = "none";
+  document.getElementById("lightboard-section")!.querySelector<HTMLElement>(".lightboard-tim")!.style.display = "none";
 
   const puzzlesSolvedEl = document.getElementById("puzzlesSolved");
   if (puzzlesSolvedEl) puzzlesSolvedEl.textContent = String(puzzlesSolved);
 
-  const timImg = document.getElementById("tim-img");
+  const timImg = document.getElementById("tim-img") as HTMLImageElement | null;
   if (timImg) {
     timImg.src = puzzlesSolved >= 5
       ? "/static/images/tim-wave.svg"
@@ -345,23 +344,31 @@ async function endRushMode() {
   showModal();
 }
 
-function showModal() {
+export function showModal(): void {
   const modal = document.getElementById("modal");
   if (modal) modal.style.display = "flex";
   launchCelebration(puzzlesSolved);
 }
 
-function hideModal() {
+export function hideModal(): void {
   const modal = document.getElementById("modal");
   if (modal) modal.style.display = "none";
   stopFireworks();
 }
 
 // ── Celebration ──────────────────────────────────────────────────────────────
-let _fwAnimId = null;
-const _fwParticles = [];
 
-function launchCelebration(n) {
+interface FwParticle {
+  x: number; y: number;
+  vx: number; vy: number;
+  alpha: number;
+  [key: string]: any;
+}
+
+let _fwAnimId: number | null = null;
+const _fwParticles: FwParticle[] = [];
+
+function launchCelebration(n: number): void {
   if (n <= 3) {
     launchConfettiPoppers(n);
   } else {
@@ -369,15 +376,15 @@ function launchCelebration(n) {
   }
 }
 
-function launchConfettiPoppers(n) {
+function launchConfettiPoppers(n: number): void {
   if (n === 0) return;
-  const canvas = document.getElementById("fireworks-canvas");
+  const canvas = document.getElementById("fireworks-canvas") as HTMLCanvasElement | null;
   const timEl = document.getElementById("tim-img");
   if (!canvas || !timEl) return;
-  const overlay = canvas.parentElement;
+  const overlay = canvas.parentElement!;
   canvas.width = overlay.offsetWidth || window.innerWidth;
   canvas.height = overlay.offsetHeight || window.innerHeight;
-  const ctx = canvas.getContext("2d");
+  const ctx = canvas.getContext("2d")!;
   _fwParticles.length = 0;
 
   const COLORS = [
@@ -389,11 +396,10 @@ function launchConfettiPoppers(n) {
   const tx = r.left + r.width / 2;
   const ty = r.top + r.height / 2;
 
-  // Origins and spray angles around Tim
   const pops = [
-    { x: tx,               y: ty - r.height * 0.65, aC: -Math.PI / 2,    spread: Math.PI * 0.55 }, // above
-    { x: tx + r.width * 0.6, y: ty,                 aC: -Math.PI * 0.15, spread: Math.PI * 0.45 }, // right
-    { x: tx - r.width * 0.6, y: ty,                 aC: -Math.PI * 0.85, spread: Math.PI * 0.45 }, // left
+    { x: tx, y: ty - r.height * 0.65, aC: -Math.PI / 2, spread: Math.PI * 0.55 },
+    { x: tx + r.width * 0.6, y: ty, aC: -Math.PI * 0.15, spread: Math.PI * 0.45 },
+    { x: tx - r.width * 0.6, y: ty, aC: -Math.PI * 0.85, spread: Math.PI * 0.45 },
   ].slice(0, n);
 
   let popsDone = 0;
@@ -426,7 +432,7 @@ function launchConfettiPoppers(n) {
   }, 360);
 
   function frame() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, canvas!.width, canvas!.height);
     for (let i = _fwParticles.length - 1; i >= 0; i--) {
       const p = _fwParticles[i];
       p.x += p.vx;
@@ -454,17 +460,17 @@ function launchConfettiPoppers(n) {
   _fwAnimId = requestAnimationFrame(frame);
 }
 
-function launchFireworks(level) {
-  const canvas = document.getElementById("fireworks-canvas");
+function launchFireworks(level: number): void {
+  const canvas = document.getElementById("fireworks-canvas") as HTMLCanvasElement | null;
   if (!canvas) return;
-  const overlay = canvas.parentElement;
+  const overlay = canvas.parentElement!;
   canvas.width = overlay.offsetWidth || window.innerWidth;
   canvas.height = overlay.offsetHeight || window.innerHeight;
-  const ctx = canvas.getContext("2d");
+  const ctx = canvas.getContext("2d")!;
   _fwParticles.length = 0;
 
   const COLORS = [0, 30, 55, 200, 280, 340];
-  const scale = level - 4; // 0 at level 4, grows with each level
+  const scale = level - 4;
   const TOTAL_BURSTS = Math.min(3 + scale * 2, 22);
   const particleCount = Math.min(35 + scale * 5, 90);
   const baseSpeed = 1.5 + Math.min(scale * 0.15, 1.5);
@@ -475,8 +481,8 @@ function launchFireworks(level) {
   function burst() {
     if (burstsDone >= TOTAL_BURSTS) return;
     burstsDone++;
-    const cx = 0.15 * canvas.width + Math.random() * 0.7 * canvas.width;
-    const cy = 0.1 * canvas.height + Math.random() * 0.5 * canvas.height;
+    const cx = 0.15 * canvas!.width + Math.random() * 0.7 * canvas!.width;
+    const cy = 0.1 * canvas!.height + Math.random() * 0.5 * canvas!.height;
     const hue = COLORS[Math.floor(Math.random() * COLORS.length)];
     for (let i = 0; i < particleCount; i++) {
       const angle = (Math.PI * 2 * i) / particleCount + (Math.random() - 0.5) * 0.3;
@@ -499,7 +505,7 @@ function launchFireworks(level) {
   }, burstInterval);
 
   function frame() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, canvas!.width, canvas!.height);
     for (let i = _fwParticles.length - 1; i >= 0; i--) {
       const p = _fwParticles[i];
       p.x += p.vx;
@@ -521,30 +527,26 @@ function launchFireworks(level) {
   _fwAnimId = requestAnimationFrame(frame);
 }
 
-function stopFireworks() {
+function stopFireworks(): void {
   if (_fwAnimId) { cancelAnimationFrame(_fwAnimId); _fwAnimId = null; }
   _fwParticles.length = 0;
-  const canvas = document.getElementById("fireworks-canvas");
-  if (canvas) canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+  const canvas = document.getElementById("fireworks-canvas") as HTMLCanvasElement | null;
+  if (canvas) canvas.getContext("2d")!.clearRect(0, 0, canvas.width, canvas.height);
 }
 
-function dismissRushModal() {
+export function dismissRushModal(): void {
   hideModal();
 
-  // Clean up preview blob URL
   const preview = document.getElementById("lightboard-preview");
-  if (preview) preview.style.display = "none";
+  if (preview) (preview as HTMLElement).style.display = "none";
   if (currentShareBlobURL) {
     URL.revokeObjectURL(currentShareBlobURL);
-    currentShareBlobURL = null;
+    setCurrentShareBlobURL(null);
   }
 
-  // Restore Tim to lightboard
-  const timEl = document.querySelector("#lightboard-section .lightboard-tim");
+  const timEl = document.querySelector<HTMLElement>("#lightboard-section .lightboard-tim");
   if (timEl) timEl.style.display = "";
-  // Swap End Rush → Menu now that rush is over
-  document.getElementById("endRushBtn").style.display = "none";
-  document.getElementById("menuBtn").style.display = "inline-block";
-  // Lock bank items so the puzzle isn't playable after dismissing
-  document.querySelectorAll(".bank-item").forEach(el => el.classList.add("bank-item--locked"));
+  document.getElementById("endRushBtn")!.style.display = "none";
+  document.getElementById("menuBtn")!.style.display = "inline-block";
+  document.querySelectorAll<HTMLElement>(".bank-item").forEach(el => el.classList.add("bank-item--locked"));
 }

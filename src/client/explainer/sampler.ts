@@ -1,27 +1,35 @@
-/* ============================================================
-   Explainer — Slide 3: Rejection Sampler
-   ============================================================ */
+// ============================================================================
+// Explainer — Slide 3: Rejection Sampler
+// ============================================================================
 
-const TARGET_BANDS = {
-  wide:   [10, 99],
-  mid:    [20, 60],
+import { reducedMotion } from './tree';
+
+const TARGET_BANDS: Record<string, [number, number]> = {
+  wide: [10, 99],
+  mid: [20, 60],
   narrow: [25, 35],
 };
-const OP_SETS = {
-  add:    ["+"],
+const OP_SETS: Record<string, string[]> = {
+  add: ["+"],
   addsub: ["+", "-"],
-  all:    ["+", "-", "*", "/"],
+  all: ["+", "-", "*", "/"],
 };
 
-function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+function randInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
 
-// Random expression of 3 distinct integers in [1..15] with random ops.
-// Form: a op1 b op2 c, evaluated with standard precedence so that
-// operator precedence is part of what the user sees.
-function genExpression(ops) {
-  const pool = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
-  // pick 3 distinct
-  const picks = [];
+interface Expression {
+  a: number;
+  b: number;
+  c: number;
+  o1: string;
+  o2: string;
+}
+
+function genExpression(ops: string[]): Expression {
+  const pool = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+  const picks: number[] = [];
   for (let i = 0; i < 3; i++) {
     const j = randInt(0, pool.length - 1);
     picks.push(pool.splice(j, 1)[0]);
@@ -31,23 +39,21 @@ function genExpression(ops) {
   return { a: picks[0], b: picks[1], c: picks[2], o1, o2 };
 }
 
-function evalExpr(e) {
-  // honor precedence: × ÷ before + −
-  const isMul = (op) => op === "*" || op === "/";
-  const apply = (x, op, y) => op === "+" ? x + y : op === "-" ? x - y : op === "*" ? x * y : y === 0 ? NaN : x / y;
+function evalExpr(e: Expression): number {
+  const isMul = (op: string) => op === "*" || op === "/";
+  const apply = (x: number, op: string, y: number) =>
+    op === "+" ? x + y : op === "-" ? x - y : op === "*" ? x * y : y === 0 ? NaN : x / y;
   if (isMul(e.o1) && !isMul(e.o2)) return apply(apply(e.a, e.o1, e.b), e.o2, e.c);
   if (!isMul(e.o1) && isMul(e.o2)) return apply(e.a, e.o1, apply(e.b, e.o2, e.c));
-  // same precedence — left to right
   return apply(apply(e.a, e.o1, e.b), e.o2, e.c);
 }
 
-const OP_DISPLAY = { "+": "+", "-": "−", "*": "×", "/": "÷" };
-function fmtExpr(e) {
+const OP_DISPLAY: Record<string, string> = { "+": "+", "-": "−", "*": "×", "/": "÷" };
+function fmtExpr(e: Expression): string {
   return `${e.a} ${OP_DISPLAY[e.o1]} ${e.b} ${OP_DISPLAY[e.o2]} ${e.c}`;
 }
 
-// Classify each attempt against the difficulty config
-function classify(e, ops, band) {
+function classify(e: Expression, _ops: string[], band: [number, number]): { ok: boolean; val: number; reason: string } {
   const v = evalExpr(e);
   if (!Number.isFinite(v)) return { ok: false, val: v, reason: "div by zero" };
   if (!Number.isInteger(v)) return { ok: false, val: v, reason: "non-integer" };
@@ -55,9 +61,7 @@ function classify(e, ops, band) {
   return { ok: true, val: v, reason: "accepted ✓" };
 }
 
-// Monte-Carlo estimate of p using N quick trials with the current settings.
-// Pure client-side; never calls the backend.
-function estimateP(opsKey, bandKey, samples = 4000) {
+function estimateP(opsKey: string, bandKey: string, samples = 4000): number {
   const ops = OP_SETS[opsKey];
   const band = TARGET_BANDS[bandKey];
   let ok = 0;
@@ -67,42 +71,43 @@ function estimateP(opsKey, bandKey, samples = 4000) {
   return Math.max(1e-6, ok / samples);
 }
 
-function fmtPct(x) {
+function fmtPct(x: number): string {
   if (x >= 0.001) return (x * 100).toFixed(1) + "%";
   return x.toExponential(2);
 }
-function fmtExpected(p) { return (1 / p).toFixed(1); }
-function fmtFail(p) {
+function fmtExpected(p: number): string { return (1 / p).toFixed(1); }
+function fmtFail(p: number): string {
   if (p >= 0.02) return "≈ 0";
   const q = Math.pow(1 - p, 2000);
   if (q < 1e-6) return "< 1e−6";
   return q.toExponential(2);
 }
 
-function refreshSamplerStats() {
-  const opsKey = document.getElementById("s-ops").value;
-  const bandKey = document.getElementById("s-range").value;
+function refreshSamplerStats(): number {
+  const opsKey = (document.getElementById("s-ops") as HTMLSelectElement).value;
+  const bandKey = (document.getElementById("s-range") as HTMLSelectElement).value;
   const p = estimateP(opsKey, bandKey);
-  document.getElementById("s-p").textContent = fmtPct(p);
-  document.getElementById("s-exp").textContent = fmtExpected(p);
-  document.getElementById("s-fail").textContent = fmtFail(p);
+  document.getElementById("s-p")!.textContent = fmtPct(p);
+  document.getElementById("s-exp")!.textContent = fmtExpected(p);
+  document.getElementById("s-fail")!.textContent = fmtFail(p);
   return p;
 }
 
-let streamTimer = null;
-function stopStream() {
+let streamTimer: ReturnType<typeof setInterval> | null = null;
+
+export function stopStream(): void {
   if (streamTimer) { clearInterval(streamTimer); streamTimer = null; }
 }
 
-function runStream() {
+function runStream(): void {
   stopStream();
-  const opsKey = document.getElementById("s-ops").value;
-  const bandKey = document.getElementById("s-range").value;
+  const opsKey = (document.getElementById("s-ops") as HTMLSelectElement).value;
+  const bandKey = (document.getElementById("s-range") as HTMLSelectElement).value;
   const ops = OP_SETS[opsKey];
   const band = TARGET_BANDS[bandKey];
   refreshSamplerStats();
 
-  const stream = document.getElementById("s-stream");
+  const stream = document.getElementById("s-stream")!;
   stream.innerHTML = "";
   let n = 0;
   const MAX = 60;
@@ -133,19 +138,15 @@ function runStream() {
   }, reducedMotion ? 30 : 90);
 }
 
-// Bind sampler controls
-["s-ops", "s-range"].forEach((id) =>
-  document.getElementById(id).addEventListener("change", refreshSamplerStats)
-);
-document.getElementById("s-run").addEventListener("click", runStream);
-refreshSamplerStats();
+export function initSampler(): void {
+  // Bind sampler controls
+  ["s-ops", "s-range"].forEach((id) =>
+    document.getElementById(id)!.addEventListener("change", () => refreshSamplerStats())
+  );
+  document.getElementById("s-run")!.addEventListener("click", runStream);
+  refreshSamplerStats();
 
-// Populate the "Go deeper" drawer's narrow-band reference numbers. Uses an
-// exhaustive enumeration over the 43,680 (15·14·13 ordered triples × 4·4
-// operator pairs) expressions rather than a Monte Carlo estimate so the
-// value the drawer cites is exact and identical across reloads — and lines
-// up with the live stat card when the user actually picks the narrow band.
-(function populateNarrowDeepDive() {
+  // Populate narrow-band deep dive
   const band = TARGET_BANDS.narrow;
   const ops = OP_SETS.all;
   let total = 0, ok = 0;
@@ -164,7 +165,7 @@ refreshSamplerStats();
     }
   }
   const p = ok / total;
-  document.getElementById("d3-narrow-p").textContent = fmtPct(p);
-  document.getElementById("d3-narrow-exp").textContent = fmtExpected(p);
-  document.getElementById("d3-narrow-fail").textContent = fmtFail(p);
-})();
+  document.getElementById("d3-narrow-p")!.textContent = fmtPct(p);
+  document.getElementById("d3-narrow-exp")!.textContent = fmtExpected(p);
+  document.getElementById("d3-narrow-fail")!.textContent = fmtFail(p);
+}

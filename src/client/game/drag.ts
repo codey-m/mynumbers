@@ -2,43 +2,54 @@
 // DRAG AND DROP HELPERS
 // ============================================================================
 
-function findNextEmptySlot() {
-  const slots = Array.from(document.querySelectorAll(".slot"));
+import {
+  SNAP_THRESHOLD, SNAP_ANIM_MS, TAP_MOVE_PX,
+  pointerState, setPointerState, PointerDragState,
+} from './state';
+import { updateControls } from './lightboard';
+import { suppressGhostClicks, lockPageScroll, unlockPageScroll } from './puzzle';
+
+// ============================================================================
+// DRAG AND DROP HELPERS
+// ============================================================================
+
+export function findNextEmptySlot(): HTMLElement | null {
+  const slots = Array.from(document.querySelectorAll<HTMLElement>(".slot"));
   for (const s of slots) {
     if (!s.querySelector(".bank-item")) return s;
   }
   return null;
 }
 
-function getDragged(ev) {
-  const id = ev.dataTransfer.getData("text/plain");
+function getDragged(ev: DragEvent): HTMLElement | null {
+  const id = ev.dataTransfer!.getData("text/plain");
   return id ? document.getElementById(id) : null;
 }
 
-function handleDropOnSlot(ev) {
+export function handleDropOnSlot(ev: DragEvent): void {
   ev.preventDefault();
   const dragged = getDragged(ev);
   if (!dragged) return;
 
-  const slot = ev.currentTarget;
+  const slot = ev.currentTarget as HTMLElement;
   const bank = document.getElementById("bank");
-  const existing = slot.querySelector(".bank-item");
+  const existing = slot.querySelector(".bank-item") as HTMLElement | null;
   if (existing && bank) bank.appendChild(existing);
 
   animateSnapAndPlace(dragged, slot);
 }
 
-function handleDropOnTemplate(ev) {
+export function handleDropOnTemplate(ev: DragEvent): void {
   ev.preventDefault();
   const dragged = getDragged(ev);
   if (!dragged) return;
 
   const bank = document.getElementById("bank");
-  const allSlots = Array.from(document.querySelectorAll(".slot"));
+  const allSlots = Array.from(document.querySelectorAll<HTMLElement>(".slot"));
   const dropX = ev.clientX;
   const dropY = ev.clientY;
 
-  let containing = null;
+  let containing: HTMLElement | null = null;
   for (const s of allSlots) {
     const r = s.getBoundingClientRect();
     if (dropX >= r.left && dropX <= r.right && dropY >= r.top && dropY <= r.bottom) {
@@ -48,7 +59,7 @@ function handleDropOnTemplate(ev) {
   }
 
   if (containing) {
-    const existing = containing.querySelector(".bank-item");
+    const existing = containing.querySelector(".bank-item") as HTMLElement | null;
     if (existing && bank) bank.appendChild(existing);
     animateSnapAndPlace(dragged, containing);
     return;
@@ -61,7 +72,7 @@ function handleDropOnTemplate(ev) {
     return;
   }
 
-  let best = null;
+  let best: HTMLElement | null = null;
   let bestDist = Infinity;
   for (const s of emptySlots) {
     const r = s.getBoundingClientRect();
@@ -81,8 +92,8 @@ function handleDropOnTemplate(ev) {
   }
 }
 
-function makeVisualClone(el, className) {
-  const clone = el.cloneNode(true);
+function makeVisualClone(el: HTMLElement, className: string): HTMLElement {
+  const clone = el.cloneNode(true) as HTMLElement;
   clone.className = "";
   clone.classList.add(className);
 
@@ -104,55 +115,55 @@ function makeVisualClone(el, className) {
   return clone;
 }
 
-function animateIntroTile(el, slot, animMs) {
+export function animateIntroTile(el: HTMLElement, slot: HTMLElement, animMs: number): void {
   if (el.parentElement === slot) return;
 
   el.dataset.animating = "1";
 
   const rectFrom = el.getBoundingClientRect();
-  const rectTo   = slot.getBoundingClientRect();
+  const rectTo = slot.getBoundingClientRect();
 
   const clone = makeVisualClone(el, "snap-clone");
-  clone.style.position     = "fixed";
-  clone.style.left         = `${rectFrom.left}px`;
-  clone.style.top          = `${rectFrom.top}px`;
-  clone.style.width        = `${rectFrom.width}px`;
-  clone.style.height       = `${rectFrom.height}px`;
-  clone.style.margin       = "0";
-  clone.style.zIndex       = "9999";
+  clone.style.position = "fixed";
+  clone.style.left = `${rectFrom.left}px`;
+  clone.style.top = `${rectFrom.top}px`;
+  clone.style.width = `${rectFrom.width}px`;
+  clone.style.height = `${rectFrom.height}px`;
+  clone.style.margin = "0";
+  clone.style.zIndex = "9999";
   clone.style.pointerEvents = "none";
-  clone.style.transition   = "none";
-  clone.style.willChange   = "left, top";
+  clone.style.transition = "none";
+  clone.style.willChange = "left, top";
   document.body.appendChild(clone);
   el.style.visibility = "hidden";
 
-  const fromX = rectFrom.left + rectFrom.width  / 2;
-  const fromY = rectFrom.top  + rectFrom.height / 2;
-  const toX   = rectTo.left   + rectTo.width    / 2;
-  const toY   = rectTo.top    + rectTo.height   / 2;
+  const fromX = rectFrom.left + rectFrom.width / 2;
+  const fromY = rectFrom.top + rectFrom.height / 2;
+  const toX = rectTo.left + rectTo.width / 2;
+  const toY = rectTo.top + rectTo.height / 2;
 
-  const vx  = toX - fromX;
-  const vy  = toY - fromY;
+  const vx = toX - fromX;
+  const vy = toY - fromY;
   const len = Math.sqrt(vx * vx + vy * vy) || 1;
   const arcSign = Math.random() < 0.5 ? 1 : -1;
-  const arcAmt  = Math.min(len * 0.35, 90) * arcSign;
+  const arcAmt = Math.min(len * 0.35, 90) * arcSign;
   const cpX = (fromX + toX) / 2 + (-vy / len) * arcAmt;
-  const cpY = (fromY + toY) / 2 + ( vx / len) * arcAmt;
+  const cpY = (fromY + toY) / 2 + (vx / len) * arcAmt;
 
-  const halfW = rectFrom.width  / 2;
+  const halfW = rectFrom.width / 2;
   const halfH = rectFrom.height / 2;
 
   const startTime = performance.now();
 
-  function easeInOut(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
-  function quad(t, p0, p1, p2) { const u = 1 - t; return u*u*p0 + 2*u*t*p1 + t*t*p2; }
+  function easeInOut(t: number) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
+  function quad(t: number, p0: number, p1: number, p2: number) { const u = 1 - t; return u * u * p0 + 2 * u * t * p1 + t * t * p2; }
 
-  function tick(now) {
+  function tick(now: number) {
     const raw = Math.min((now - startTime) / animMs, 1);
-    const t   = easeInOut(raw);
+    const t = easeInOut(raw);
 
     clone.style.left = `${quad(t, fromX, cpX, toX) - halfW}px`;
-    clone.style.top  = `${quad(t, fromY, cpY, toY) - halfH}px`;
+    clone.style.top = `${quad(t, fromY, cpY, toY) - halfH}px`;
 
     if (raw < 1) { requestAnimationFrame(tick); } else { done(); }
   }
@@ -162,8 +173,8 @@ function animateIntroTile(el, slot, animMs) {
   function done() {
     try { clone.remove(); } catch (_) {}
 
-    const bank     = document.getElementById("bank");
-    const existing = slot.querySelector(".bank-item");
+    const bank = document.getElementById("bank");
+    const existing = slot.querySelector(".bank-item") as HTMLElement | null;
     if (existing && bank) bank.appendChild(existing);
 
     slot.appendChild(el);
@@ -177,7 +188,7 @@ function animateIntroTile(el, slot, animMs) {
   }
 }
 
-function animateSnapAndPlace(el, slot, animMs = SNAP_ANIM_MS) {
+export function animateSnapAndPlace(el: HTMLElement, slot: HTMLElement, animMs = SNAP_ANIM_MS): void {
   document.body.classList.remove("dragging");
   if (el.parentElement === slot) return;
 
@@ -193,7 +204,7 @@ function animateSnapAndPlace(el, slot, animMs = SNAP_ANIM_MS) {
   clone.style.width = `${rectFrom.width}px`;
   clone.style.height = `${rectFrom.height}px`;
   clone.style.margin = "0";
-  clone.style.zIndex = 9999;
+  clone.style.zIndex = "9999";
   clone.style.pointerEvents = "none";
   clone.style.transform = "translate(0px, 0px) scale(1)";
   clone.style.opacity = "1";
@@ -214,12 +225,10 @@ function animateSnapAndPlace(el, slot, animMs = SNAP_ANIM_MS) {
 
   const cleanup = () => {
     clone.removeEventListener("transitionend", cleanup);
-    try {
-      clone.remove();
-    } catch (_) {}
+    try { clone.remove(); } catch (_) {}
 
     const bank = document.getElementById("bank");
-    const existing = slot.querySelector(".bank-item");
+    const existing = slot.querySelector(".bank-item") as HTMLElement | null;
     if (existing && bank) bank.appendChild(existing);
 
     slot.appendChild(el);
@@ -240,7 +249,7 @@ function animateSnapAndPlace(el, slot, animMs = SNAP_ANIM_MS) {
 // TOUCH AND POINTER HANDLERS
 // ============================================================================
 
-function pointerDownHandler(ev) {
+export function pointerDownHandler(ev: PointerEvent): void {
   if (ev.pointerType === "mouse") return;
 
   if (typeof ev.button === "number") {
@@ -251,14 +260,12 @@ function pointerDownHandler(ev) {
   suppressGhostClicks();
   lockPageScroll();
 
-  const el = ev.currentTarget;
+  const el = ev.currentTarget as HTMLElement;
 
   if (pointerState) endPointerDrag({ revealOriginal: true, removeClone: true });
 
   if (typeof el.setPointerCapture === "function") {
-    try {
-      el.setPointerCapture(ev.pointerId);
-    } catch (_) {}
+    try { el.setPointerCapture(ev.pointerId); } catch (_) {}
   }
 
   const rect = el.getBoundingClientRect();
@@ -269,7 +276,7 @@ function pointerDownHandler(ev) {
   clone.style.top = `${rect.top}px`;
   clone.style.width = `${rect.width}px`;
   clone.style.height = `${rect.height}px`;
-  clone.style.zIndex = 9999;
+  clone.style.zIndex = "9999";
   clone.style.pointerEvents = "none";
   clone.style.margin = "0";
 
@@ -277,7 +284,7 @@ function pointerDownHandler(ev) {
   el.style.visibility = "hidden";
   document.body.classList.add("dragging");
 
-  pointerState = {
+  setPointerState({
     pointerId: ev.pointerId,
     originEl: el,
     clone,
@@ -288,33 +295,32 @@ function pointerDownHandler(ev) {
     lastX: ev.clientX,
     lastY: ev.clientY,
     startT: performance.now(),
-  };
+  });
 
   window.addEventListener("pointermove", pointerMoveHandler, { passive: false });
   window.addEventListener("pointerup", pointerUpHandler, { passive: false });
   window.addEventListener("pointercancel", pointerCancelHandler, { passive: false });
 }
 
-function pointerMoveHandler(ev) {
+function pointerMoveHandler(ev: PointerEvent): void {
   if (!pointerState) return;
   if (ev.pointerId !== pointerState.pointerId) return;
 
   ev.preventDefault();
 
-  pointerState.lastX = ev.clientX;
-  pointerState.lastY = ev.clientY;
+  const ps = pointerState;
+  setPointerState({ ...ps, lastX: ev.clientX, lastY: ev.clientY });
 
-  const clone = pointerState.clone;
-  clone.style.left = `${ev.clientX - pointerState.offsetX}px`;
-  clone.style.top = `${ev.clientY - pointerState.offsetY}px`;
+  pointerState!.clone.style.left = `${ev.clientX - ps.offsetX}px`;
+  pointerState!.clone.style.top = `${ev.clientY - ps.offsetY}px`;
 
-  const allSlots = Array.from(document.querySelectorAll(".slot"));
+  const allSlots = Array.from(document.querySelectorAll<HTMLElement>(".slot"));
   const emptySlots = allSlots.filter((s) => !s.querySelector(".bank-item"));
 
-  document.querySelectorAll(".slot").forEach((s) => s.classList.remove("slot-highlight"));
+  document.querySelectorAll<HTMLElement>(".slot").forEach((s) => s.classList.remove("slot-highlight"));
   if (emptySlots.length === 0) return;
 
-  let best = null;
+  let best: HTMLElement | null = null;
   let bestDist = Infinity;
   const x = ev.clientX;
   const y = ev.clientY;
@@ -333,7 +339,7 @@ function pointerMoveHandler(ev) {
   if (best && bestDist <= SNAP_THRESHOLD) best.classList.add("slot-highlight");
 }
 
-function pointerUpHandler(ev) {
+function pointerUpHandler(ev: PointerEvent): void {
   if (!pointerState) return;
   if (ev.pointerId !== pointerState.pointerId) return;
 
@@ -348,7 +354,7 @@ function pointerUpHandler(ev) {
   const lastY = pointerState.lastY;
   const startT = pointerState.startT;
 
-  document.querySelectorAll(".slot").forEach((s) => s.classList.remove("slot-highlight"));
+  document.querySelectorAll<HTMLElement>(".slot").forEach((s) => s.classList.remove("slot-highlight"));
 
   const dist = Math.hypot(lastX - startX, lastY - startY);
   const dt = performance.now() - startT;
@@ -370,9 +376,9 @@ function pointerUpHandler(ev) {
   const x = ev.clientX;
   const y = ev.clientY;
 
-  const allSlots = Array.from(document.querySelectorAll(".slot"));
+  const allSlots = Array.from(document.querySelectorAll<HTMLElement>(".slot"));
 
-  let containing = null;
+  let containing: HTMLElement | null = null;
   for (const s of allSlots) {
     const r = s.getBoundingClientRect();
     if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
@@ -385,7 +391,7 @@ function pointerUpHandler(ev) {
 
   if (!target) {
     const emptySlots = allSlots.filter((s) => !s.querySelector(".bank-item"));
-    let best = null;
+    let best: HTMLElement | null = null;
     let bestDist = Infinity;
 
     for (const s of emptySlots) {
@@ -412,13 +418,13 @@ function pointerUpHandler(ev) {
   }
 
   const bank = document.getElementById("bank");
-  const existing = target.querySelector(".bank-item");
+  const existing = target.querySelector(".bank-item") as HTMLElement | null;
   if (existing && bank) bank.appendChild(existing);
 
   animatePointerCloneIntoSlot({ dragClone: clone, originEl, slot: target });
 }
 
-function pointerCancelHandler(ev) {
+function pointerCancelHandler(ev: PointerEvent): void {
   if (!pointerState) return;
   if (ev.pointerId !== pointerState.pointerId) return;
 
@@ -428,19 +434,19 @@ function pointerCancelHandler(ev) {
   updateControls();
 }
 
-function cancelActiveDrag() {
+export function cancelActiveDrag(): void {
   if (!pointerState) return;
   window.removeEventListener("pointermove", pointerMoveHandler);
-  window.removeEventListener("pointerup",   pointerUpHandler);
+  window.removeEventListener("pointerup", pointerUpHandler);
   window.removeEventListener("pointercancel", pointerCancelHandler);
   document.body.classList.remove("dragging");
-  document.querySelectorAll(".slot").forEach(s => s.classList.remove("slot-highlight"));
-  if (pointerState.clone) try { pointerState.clone.remove(); } catch(_) {}
+  document.querySelectorAll<HTMLElement>(".slot").forEach(s => s.classList.remove("slot-highlight"));
+  if (pointerState.clone) try { pointerState.clone.remove(); } catch (_) {}
   if (pointerState.originEl) pointerState.originEl.style.visibility = "";
-  pointerState = null;
+  setPointerState(null);
 }
 
-function endPointerDrag({ revealOriginal, removeClone }) {
+function endPointerDrag({ revealOriginal, removeClone }: { revealOriginal: boolean; removeClone: boolean }): void {
   if (!pointerState) return;
 
   window.removeEventListener("pointermove", pointerMoveHandler);
@@ -448,20 +454,18 @@ function endPointerDrag({ revealOriginal, removeClone }) {
   window.removeEventListener("pointercancel", pointerCancelHandler);
 
   document.body.classList.remove("dragging");
-  document.querySelectorAll(".slot").forEach((s) => s.classList.remove("slot-highlight"));
+  document.querySelectorAll<HTMLElement>(".slot").forEach((s) => s.classList.remove("slot-highlight"));
 
   if (removeClone && pointerState.clone) {
-    try {
-      pointerState.clone.remove();
-    } catch (_) {}
+    try { pointerState.clone.remove(); } catch (_) {}
   }
 
   if (revealOriginal && pointerState.originEl) pointerState.originEl.style.visibility = "";
 
-  pointerState = null;
+  setPointerState(null);
 }
 
-function animatePointerCloneIntoSlot({ dragClone, originEl, slot }) {
+function animatePointerCloneIntoSlot({ dragClone, originEl, slot }: { dragClone: HTMLElement; originEl: HTMLElement; slot: HTMLElement }): void {
   endPointerDrag({ revealOriginal: false, removeClone: false });
 
   const rectFrom = dragClone.getBoundingClientRect();
@@ -478,9 +482,7 @@ function animatePointerCloneIntoSlot({ dragClone, originEl, slot }) {
 
   const cleanup = () => {
     dragClone.removeEventListener("transitionend", cleanup);
-    try {
-      dragClone.remove();
-    } catch (_) {}
+    try { dragClone.remove(); } catch (_) {}
 
     slot.appendChild(originEl);
     originEl.style.visibility = "";

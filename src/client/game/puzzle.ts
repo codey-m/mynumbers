@@ -1,25 +1,41 @@
 // ============================================================================
+// PUZZLE MANAGEMENT & SCROLL LOCK
+// ============================================================================
+
+import {
+  puzzle, gameMode, puzzlesSolved, currentDifficulty, maxDifficultyReached,
+  rushStarted, rushIntroPlaying, skipIntroAnimation,
+  pointerState, scrollLocked, suppressClickUntil, CLICK_SUPPRESS_MS,
+  setPuzzle, setCurrentDifficulty, setMaxDifficultyReached,
+  setPuzzlesSolved, setScrollLocked, setSuppressClickUntil,
+  setSkipIntroAnimation, Puzzle,
+} from './state';
+import { updateControls, addEquationToLightboard, playWrongFillAnimation } from './lightboard';
+import { calculateDifficulty, updateRushUI, startCountdown } from './rush';
+import { cancelActiveDrag, handleDropOnSlot, pointerDownHandler, animateSnapAndPlace } from './drag';
+
+// ============================================================================
 // SCROLL LOCK (iOS)
 // ============================================================================
 
-function touchMoveBlocker(e) {
+function touchMoveBlocker(e: TouchEvent) {
   if (pointerState) e.preventDefault();
 }
 window.addEventListener("touchmove", touchMoveBlocker, { passive: false });
 
-function suppressGhostClicks() {
-  suppressClickUntil = Date.now() + CLICK_SUPPRESS_MS;
+export function suppressGhostClicks(): void {
+  setSuppressClickUntil(Date.now() + CLICK_SUPPRESS_MS);
 }
 
-function lockPageScroll() {
+export function lockPageScroll(): void {
   if (scrollLocked) return;
-  scrollLocked = true;
+  setScrollLocked(true);
   document.body.style.overflow = "hidden";
 }
 
-function unlockPageScroll() {
+export function unlockPageScroll(): void {
   if (!scrollLocked) return;
-  scrollLocked = false;
+  setScrollLocked(false);
   document.body.style.overflow = "";
 }
 
@@ -27,20 +43,20 @@ function unlockPageScroll() {
 // PUZZLE MANAGEMENT
 // ============================================================================
 
-function newPuzzle() {
+export function newPuzzle(): void {
   cancelActiveDrag();
   let endpoint = "/api/puzzle/rush?difficulty=3&decoys=2";
 
   if (gameMode === "rush3" || gameMode === "rush5") {
-    currentDifficulty = calculateDifficulty(puzzlesSolved);
-    if (currentDifficulty > maxDifficultyReached) maxDifficultyReached = currentDifficulty;
+    setCurrentDifficulty(calculateDifficulty(puzzlesSolved));
+    if (currentDifficulty > maxDifficultyReached) setMaxDifficultyReached(currentDifficulty);
     endpoint = `/api/puzzle/rush?difficulty=${currentDifficulty}&decoys=2`;
   }
 
   fetch(endpoint)
     .then((r) => r.json())
-    .then((data) => {
-      puzzle = data;
+    .then((data: Puzzle) => {
+      setPuzzle(data);
       renderTemplate(data.template_tokens);
       renderBank(data.numbers);
 
@@ -53,7 +69,7 @@ function newPuzzle() {
         updateRushUI();
         if (!rushStarted) {
           if (skipIntroAnimation) {
-            skipIntroAnimation = false;
+            setSkipIntroAnimation(false);
             startCountdown();
           } else {
             playWrongFillAnimation();
@@ -71,14 +87,13 @@ function newPuzzle() {
     });
 }
 
-function renderTemplate(tokens) {
+export function renderTemplate(tokens: string[]): void {
   const container = document.getElementById("template-area");
   if (!container) return;
 
   container.innerHTML = "";
 
-  // Map backend operators to display symbols
-  const DISPLAY_OPS = {
+  const DISPLAY_OPS: Record<string, string> = {
     "*": "×",
     "/": "÷",
   };
@@ -96,12 +111,12 @@ function renderTemplate(tokens) {
       slot.dataset.slotIndex = idx;
 
       slot.addEventListener("dragover", (ev) => ev.preventDefault());
-      slot.addEventListener("drop", handleDropOnSlot);
+      slot.addEventListener("drop", handleDropOnSlot as EventListener);
 
       slot.addEventListener("click", (ev) => {
-        const child = slot.querySelector(".bank-item");
+        const child = slot.querySelector(".bank-item") as HTMLElement | null;
         if (!child) return;
-        if (!ev.target.closest(".bank-item")) return;
+        if (!(ev.target as HTMLElement).closest(".bank-item")) return;
         const bank = document.getElementById("bank");
         if (bank) bank.appendChild(child);
         updateControls();
@@ -117,11 +132,10 @@ function renderTemplate(tokens) {
   });
 
   container.appendChild(row);
-
   updateControls();
 }
 
-function renderBank(numbers) {
+export function renderBank(numbers: number[]): void {
   const bank = document.getElementById("bank");
   if (!bank) return;
 
@@ -143,10 +157,10 @@ function renderBank(numbers) {
 
     item.addEventListener("dragstart", (ev) => {
       document.body.classList.add("dragging");
-      ev.dataTransfer.effectAllowed = "move";
-      ev.dataTransfer.setData("text/plain", ev.target.id);
+      ev.dataTransfer!.effectAllowed = "move";
+      ev.dataTransfer!.setData("text/plain", (ev.target as HTMLElement).id);
       try {
-        ev.dataTransfer.setDragImage(ev.target, ev.offsetX, ev.offsetY);
+        ev.dataTransfer!.setDragImage(ev.target as HTMLElement, ev.offsetX, ev.offsetY);
       } catch (_) {}
     });
 
@@ -158,9 +172,9 @@ function renderBank(numbers) {
         if (!el) return;
 
         if (el.dataset.animating === "1") {
-          setTimeout(() => finalizeDragEndCheck(el), SNAP_ANIM_MS + 120);
+          setTimeout(() => finalizeDragEndCheck(el as HTMLElement), 180 + 120);
         } else {
-          finalizeDragEndCheck(el);
+          finalizeDragEndCheck(el as HTMLElement);
         }
       }, 0);
     });
@@ -176,10 +190,9 @@ function renderBank(numbers) {
   updateControls();
 }
 
-function finalizeDragEndCheck(el) {
+export function finalizeDragEndCheck(el: HTMLElement): void {
   const parent = el.parentElement;
   const insideSlot = parent?.closest ? parent.closest(".slot") : null;
-
   const inBank = parent ? parent.id === "bank" : false;
 
   if (!insideSlot && !inBank) {
@@ -193,12 +206,12 @@ function finalizeDragEndCheck(el) {
   updateControls();
 }
 
-function resetSlots() {
+export function resetSlots(): void {
   if (!puzzle) return;
   const bank = document.getElementById("bank");
   if (!bank) return;
 
-  document.querySelectorAll(".slot .bank-item").forEach((el) => bank.appendChild(el));
+  document.querySelectorAll<HTMLElement>(".slot .bank-item").forEach((el) => bank.appendChild(el));
 
   const resultEl = document.getElementById("result");
   if (resultEl) resultEl.textContent = "";
@@ -206,11 +219,11 @@ function resetSlots() {
   updateControls();
 }
 
-function buildExpressionFromTemplate() {
+function buildExpressionFromTemplate(): { expression?: string; error?: string } | null {
   if (!puzzle) return null;
 
   const tokens = puzzle.template_tokens;
-  const parts = [];
+  const parts: string[] = [];
 
   for (const tok of tokens) {
     const isSlot = tok.startsWith("{") ? tok.endsWith("}") : false;
@@ -220,10 +233,10 @@ function buildExpressionFromTemplate() {
       const slot = document.querySelector(`.slot[data-slot-index="${idx}"]`);
       if (!slot) return { error: `Slot ${idx} missing` };
 
-      const child = slot.querySelector(".bank-item");
+      const child = slot.querySelector(".bank-item") as HTMLElement | null;
       if (!child) return { error: `Slot ${idx} is empty` };
 
-      parts.push(child.dataset.value);
+      parts.push(child.dataset.value!);
     } else {
       parts.push(tok);
     }
@@ -232,7 +245,7 @@ function buildExpressionFromTemplate() {
   return { expression: parts.join("") };
 }
 
-function checkPuzzle() {
+export function checkPuzzle(): void {
   const built = buildExpressionFromTemplate();
   const resultEl = document.getElementById("result");
 
@@ -256,15 +269,14 @@ function checkPuzzle() {
     return;
   }
 
-  // Replace * and / with display symbols for the expression shown to user
-  const displayExpr = built.expression
+  const displayExpr = built.expression!
     .replace(/\*/g, "×")
     .replace(/\//g, "÷");
 
   const payload = {
-    numbers: puzzle.numbers,
+    numbers: puzzle!.numbers,
     expression: built.expression,
-    target: puzzle.target,
+    target: puzzle!.target,
   };
 
   fetch("/api/puzzle/check", {
@@ -273,8 +285,7 @@ function checkPuzzle() {
     body: JSON.stringify(payload),
   })
     .then((r) => r.json())
-    .then((data) => {
-      // Use evaluated_display for user-facing messages (shows fractions properly)
+    .then((data: any) => {
       const evalDisplay = data.evaluated_display || String(data.evaluated);
 
       if (data.reason === "invalid_expression") {
@@ -285,8 +296,8 @@ function checkPuzzle() {
 
       if (data.reason === "correct") {
         if (gameMode === "rush3" || gameMode === "rush5") {
-          puzzlesSolved += 1;
-          addEquationToLightboard(`${displayExpr} = ${puzzle.target}`);
+          setPuzzlesSolved(puzzlesSolved + 1);
+          addEquationToLightboard(`${displayExpr} = ${puzzle!.target}`);
 
           resultEl.textContent = `Correct! Level ${puzzlesSolved + 1}`;
           resultEl.className = "result success";
@@ -302,7 +313,7 @@ function checkPuzzle() {
       }
 
       if (data.reason === "wrong_value") {
-        resultEl.textContent = `Incorrect. Got ${evalDisplay}, need ${puzzle.target}`;
+        resultEl.textContent = `Incorrect. Got ${evalDisplay}, need ${puzzle!.target}`;
         resultEl.className = "result error";
         return;
       }
@@ -317,7 +328,7 @@ function checkPuzzle() {
     });
 }
 
-function canCheck() {
+export function canCheck(): boolean {
   const totalSlots = document.querySelectorAll(".slot").length;
   const filledSlots = document.querySelectorAll(".slot .bank-item").length;
   return totalSlots > 0 && filledSlots === totalSlots;
