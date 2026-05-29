@@ -13,7 +13,7 @@ import {
 import { updateControls, addEquationToLightboard, playWrongFillAnimation } from './lightboard';
 import { calculateDifficulty, updateRushUI, startCountdown } from './rush';
 import { cancelActiveDrag, handleDropOnSlot, pointerDownHandler, animateSnapAndPlace } from './drag';
-import { puzzleRush, puzzleCheck } from './puzzles';
+import { puzzleRush, puzzleCheck } from './generator';
 
 // ============================================================================
 // SCROLL LOCK (iOS)
