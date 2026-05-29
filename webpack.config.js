@@ -3,7 +3,7 @@ const path = require('path');
 module.exports = {
   mode: 'production',
   entry: {
-    game: './src/client/game/index.ts',
+    game: './src/client/game/index.tsx',
     explainer: './src/client/explainer/index.ts',
   },
   output: {
@@ -12,12 +12,12 @@ module.exports = {
     clean: false,
   },
   resolve: {
-    extensions: ['.ts', '.js'],
+    extensions: ['.tsx', '.ts', '.js'],
   },
   module: {
     rules: [
       {
-        test: /\.ts$/,
+        test: /\.tsx?$/,
         use: {
           loader: 'ts-loader',
           options: {
