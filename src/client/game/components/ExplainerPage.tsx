@@ -1,5 +1,5 @@
 import { useEffect } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate } from "../router"
 import { initCarousel } from "../../explainer/carousel"
 import { initSampler } from "../../explainer/sampler"
 import { initPerms } from "../../explainer/perms"

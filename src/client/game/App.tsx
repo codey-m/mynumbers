@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react"
-import { Link } from "react-router-dom"
+import { Link } from "./router"
 import styled from "styled-components"
 import { useGameState, useGameDispatch } from "./context/GameContext"
 import { Logo } from "./components/Logo"
