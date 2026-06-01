@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { initCarousel } from "../../explainer/carousel"
 import { initSampler } from "../../explainer/sampler"
 import { initPerms } from "../../explainer/perms"
+import { ExplainerContainer, ExplainerGlobalStyles } from "./ExplainerStyles"
 
 export function ExplainerPage() {
   const navigate = useNavigate()
@@ -19,7 +20,9 @@ export function ExplainerPage() {
   }, [])
 
   return (
-    <div className="container explainer-container">
+    <>
+      <ExplainerGlobalStyles />
+      <ExplainerContainer>
       {/* Top bar */}
       <header className="ex-topbar" aria-label="Explainer navigation">
         <button className="ex-back" aria-label="Back to game" onClick={() => navigate("/")}>
@@ -307,6 +310,7 @@ export function ExplainerPage() {
         <div className="ex-dots" id="ex-dots" role="tablist" aria-label="Slide indicators" />
         <button id="ex-next" className="ex-nav-btn ex-nav-btn-primary">Next →</button>
       </nav>
-    </div>
+    </ExplainerContainer>
+    </>
   )
 }

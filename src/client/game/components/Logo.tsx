@@ -1,4 +1,26 @@
 import { useMemo } from "react"
+import styled from "styled-components"
+
+const LogoBanner = styled.h1`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  margin: 0 0 16px;
+  font-size: 0;
+  user-select: none;
+
+  svg {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    width: min(560px, 95vw);
+  }
+
+  body.menu-mode & svg {
+    width: min(720px, 95vw);
+  }
+`
 
 // Dot-matrix letter patterns (11 rows tall)
 const LETTERS: Record<string, string[]> = {
@@ -174,7 +196,7 @@ export function Logo() {
   const { dots, width, height } = useMemo(buildDots, [])
 
   return (
-    <h1 className="logo-banner logo-dotmatrix" aria-label="ARITHMIX">
+    <LogoBanner aria-label="ARITHMIX">
       <svg
         xmlns="http://www.w3.org/2000/svg"
         viewBox={`0 0 ${width} ${height}`}
@@ -193,6 +215,6 @@ export function Logo() {
           />
         ))}
       </svg>
-    </h1>
+    </LogoBanner>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react"
 import { Link } from "react-router-dom"
+import styled from "styled-components"
 import { useGameState, useGameDispatch } from "./context/GameContext"
 import { Logo } from "./components/Logo"
 import { ModeSelector } from "./components/ModeSelector"
@@ -13,6 +14,69 @@ import { RushReadyModal, GameOverModal } from "./components/Modals"
 import { Countdown } from "./components/Countdown"
 import { useTimer } from "./hooks/useTimer"
 import { useGameActions } from "./hooks/useGameActions"
+
+const Container = styled.div`
+  max-width: 900px;
+  margin: 24px auto;
+  padding: 18px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(2, 6, 23, 0.08);
+
+  @media (max-width: 600px) {
+    margin: 6px auto;
+    padding: 10px;
+  }
+`
+
+const HowToPlay = styled.div`
+  margin: 10px 0 4px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #f5f5f5;
+  border-left: 3px solid #750014;
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.5;
+`
+
+const ExplainerLinkRow = styled.div`
+  display: none;
+  text-align: center;
+  margin: 16px 0;
+
+  body.menu-mode & {
+    display: block;
+  }
+
+  @media (max-width: 600px) {
+    margin: 10px 0;
+  }
+`
+
+const ExplainerLink = styled(Link)`
+  display: inline-block;
+  padding: clamp(10px, 1.1vw, 16px) clamp(20px, 2.4vw, 36px);
+  border: 2px solid #fff;
+  border-radius: 8px;
+  background: #dde1e6;
+  font-family: 'Fredoka One', system-ui, sans-serif;
+  font-size: clamp(16px, 1.4vw, 22px);
+  letter-spacing: 0.5px;
+  color: #000;
+  text-decoration: none;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 150ms, transform 100ms;
+
+  span {
+    color: #750014;
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+`
 
 export function App() {
   const state = useGameState()
@@ -83,36 +147,32 @@ export function App() {
 
   if (state.showMenu) {
     return (
-      <div className="container menu-mode">
+      <Container>
         <Logo />
         <ModeSelector />
-        <div className="template-area">
-          <p style={{ textAlign: "center", color: "#999", padding: "20px" }}>
-            Select a mode to begin
-          </p>
-        </div>
-        <div className="explainer-link-row">
-          <Link to="/explainer" className="explainer-link">
+        <TemplateArea />
+        <ExplainerLinkRow>
+          <ExplainerLink to="/explainer">
             Inside <span>ARITHMIX</span>
-          </Link>
-        </div>
+          </ExplainerLink>
+        </ExplainerLinkRow>
         <HomeLightboard />
-      </div>
+      </Container>
     )
   }
 
   return (
-    <div className="container">
+    <Container>
       <Logo />
 
       {isRush && <RushStats />}
       {state.mode === "practice" && <PracticeStats />}
 
       {state.mode === "practice" && (
-        <div className="how-to-play">
+        <HowToPlay>
           <strong>How to play:</strong> Drag (or tap) numbers from the bank into
           the empty slots to make the equation equal the <strong>Target</strong>.
-        </div>
+        </HowToPlay>
       )}
 
       <TemplateArea />
@@ -125,6 +185,6 @@ export function App() {
       <RushReadyModal onStart={handleRushReady} />
       <GameOverModal onPlayAgain={playAgain} />
       <Countdown />
-    </div>
+    </Container>
   )
 }

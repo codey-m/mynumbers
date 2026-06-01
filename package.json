@@ -14,13 +14,15 @@
     "express": "^4.18.2",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "react-router-dom": "^7.16.0"
+    "react-router-dom": "^7.16.0",
+    "styled-components": "^6.4.2"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/node": "^20.11.0",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
+    "@types/styled-components": "^5.1.36",
     "ts-loader": "^9.5.7",
     "typescript": "^5.9.3",
     "webpack": "^5.107.2",

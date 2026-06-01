@@ -3,7 +3,7 @@
 // ============================================================================
 
 type Fraction = [number, number]
-type Expr = number | [Expr, string, Expr]
+type Expression = number | [Expression, string, Expression]
 
 interface DifficultyConfig {
   ops: string[]
@@ -40,12 +40,12 @@ export interface CheckResult {
 // CONSTANTS
 // ============================================================================
 
-const OPS = ['+', '-', '*', '/']
-const MAX_LEAF = 19
-const MIN_LEAF = 1
-const ATTEMPTS = 2000
+const ALL_OPERATORS = ['+', '-', '*', '/']
+const MAX_LEAF_VALUE = 19
+const MIN_LEAF_VALUE = 1
+const MAX_GENERATION_ATTEMPTS = 2000
 
-const OP_PRECEDENCE: Record<string, number> = { '+': 1, '-': 1, '*': 2, '/': 2 }
+const OPERATOR_PRECEDENCE: Record<string, number> = { '+': 1, '-': 1, '*': 2, '/': 2 }
 
 const DIFFICULTY_CONFIGS: Record<number, DifficultyConfig> = {
   1: { ops: ['+'], min_leaf: 1, max_leaf: 10, target_min: 10, target_max: 25, min_parens: 0, max_parens: 0, max_muls: 0, max_divs: 0 },
@@ -66,19 +66,19 @@ const DIFFICULTY_CONFIGS: Record<number, DifficultyConfig> = {
 // FRACTION ARITHMETIC
 // ============================================================================
 
-function gcd(a: number, b: number): number {
+function greatestCommonDivisor(a: number, b: number): number {
   a = Math.abs(a)
   b = Math.abs(b)
   while (b) { [a, b] = [b, a % b] }
   return a
 }
 
-function normalizeFraction(n: number, d: number): Fraction {
-  if (d === 0) throw new Error('Division by zero')
-  if (n === 0) return [0, 1]
-  const sign = (d < 0) ? -1 : 1
-  const g = gcd(Math.abs(n), Math.abs(d))
-  return [sign * n / g, sign * d / g]
+function normalizeFraction(numerator: number, denominator: number): Fraction {
+  if (denominator === 0) throw new Error('Division by zero')
+  if (numerator === 0) return [0, 1]
+  const sign = (denominator < 0) ? -1 : 1
+  const divisor = greatestCommonDivisor(Math.abs(numerator), Math.abs(denominator))
+  return [sign * numerator / divisor, sign * denominator / divisor]
 }
 
 function addFractions([n1, d1]: Fraction, [n2, d2]: Fraction): Fraction { return normalizeFraction(n1 * d2 + n2 * d1, d1 * d2) }
@@ -93,147 +93,147 @@ function divideFractions([n1, d1]: Fraction, [n2, d2]: Fraction): Fraction {
 // EXPRESSION CONSTRUCTION
 // ============================================================================
 
-function randomInt(min: number, max: number): number {
+function randomIntInRange(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
-function randomChoice<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)]
+function pickRandom<T>(items: T[]): T {
+  return items[Math.floor(Math.random() * items.length)]
 }
 
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr]
-  for (let i = a.length - 1; i > 0; i--) {
+function shuffleArray<T>(items: T[]): T[] {
+  const copy = [...items]
+  for (let i = copy.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
-    ;[a[i], a[j]] = [a[j], a[i]]
+    ;[copy[i], copy[j]] = [copy[j], copy[i]]
   }
-  return a
+  return copy
 }
 
-function makeRandomExprConstrained(numOperands: number, allowedOps: string[], minVal: number, maxVal: number): Expr {
-  if (numOperands === 1) return randomInt(minVal, maxVal)
-  const leftCount = randomInt(1, numOperands - 1)
-  const rightCount = numOperands - leftCount
-  const left = makeRandomExprConstrained(leftCount, allowedOps, minVal, maxVal)
-  const right = makeRandomExprConstrained(rightCount, allowedOps, minVal, maxVal)
-  const op = randomChoice(allowedOps)
-  return [left, op, right]
+function buildRandomExpressionConstrained(operandCount: number, allowedOps: string[], minLeafValue: number, maxLeafValue: number): Expression {
+  if (operandCount === 1) return randomIntInRange(minLeafValue, maxLeafValue)
+  const leftOperandCount = randomIntInRange(1, operandCount - 1)
+  const rightOperandCount = operandCount - leftOperandCount
+  const leftSubtree = buildRandomExpressionConstrained(leftOperandCount, allowedOps, minLeafValue, maxLeafValue)
+  const rightSubtree = buildRandomExpressionConstrained(rightOperandCount, allowedOps, minLeafValue, maxLeafValue)
+  const operator = pickRandom(allowedOps)
+  return [leftSubtree, operator, rightSubtree]
 }
 
-function makeRandomExpr(numOperands: number): Expr {
-  if (numOperands === 1) return randomInt(MIN_LEAF, MAX_LEAF)
-  const leftCount = randomInt(1, numOperands - 1)
-  const rightCount = numOperands - leftCount
-  const left = makeRandomExpr(leftCount)
-  const right = makeRandomExpr(rightCount)
-  const op = randomChoice(OPS)
-  return [left, op, right]
+function buildRandomExpression(operandCount: number): Expression {
+  if (operandCount === 1) return randomIntInRange(MIN_LEAF_VALUE, MAX_LEAF_VALUE)
+  const leftOperandCount = randomIntInRange(1, operandCount - 1)
+  const rightOperandCount = operandCount - leftOperandCount
+  const leftSubtree = buildRandomExpression(leftOperandCount)
+  const rightSubtree = buildRandomExpression(rightOperandCount)
+  const operator = pickRandom(ALL_OPERATORS)
+  return [leftSubtree, operator, rightSubtree]
 }
 
-function evalExprFraction(expr: Expr): Fraction {
-  if (typeof expr === 'number') return [expr, 1]
-  const [left, op, right] = expr
-  const a = evalExprFraction(left)
-  const b = evalExprFraction(right)
-  switch (op) {
-    case '+': return addFractions(a, b)
-    case '-': return subtractFractions(a, b)
-    case '*': return multiplyFractions(a, b)
-    case '/': return divideFractions(a, b)
+function evaluateExpressionAsFraction(expression: Expression): Fraction {
+  if (typeof expression === 'number') return [expression, 1]
+  const [leftExpr, operator, rightExpr] = expression
+  const leftValue = evaluateExpressionAsFraction(leftExpr)
+  const rightValue = evaluateExpressionAsFraction(rightExpr)
+  switch (operator) {
+    case '+': return addFractions(leftValue, rightValue)
+    case '-': return subtractFractions(leftValue, rightValue)
+    case '*': return multiplyFractions(leftValue, rightValue)
+    case '/': return divideFractions(leftValue, rightValue)
     default: throw new Error('Unknown operator')
   }
 }
 
-function collectLeaves(expr: Expr): number[] {
-  if (typeof expr === 'number') return [expr]
-  const [left, , right] = expr
-  return [...collectLeaves(left), ...collectLeaves(right)]
+function collectLeafValues(expression: Expression): number[] {
+  if (typeof expression === 'number') return [expression]
+  const [leftExpr, , rightExpr] = expression
+  return [...collectLeafValues(leftExpr), ...collectLeafValues(rightExpr)]
 }
 
-function countOperator(expr: Expr, op: string): number {
-  if (typeof expr === 'number') return 0
-  const [left, nodeOp, right] = expr
-  return (nodeOp === op ? 1 : 0) + countOperator(left, op) + countOperator(right, op)
+function countOperatorOccurrences(expression: Expression, targetOperator: string): number {
+  if (typeof expression === 'number') return 0
+  const [leftExpr, operator, rightExpr] = expression
+  return (operator === targetOperator ? 1 : 0) + countOperatorOccurrences(leftExpr, targetOperator) + countOperatorOccurrences(rightExpr, targetOperator)
 }
 
 // ============================================================================
 // MINIMAL-PARENTHESES STRINGIFIERS
 // ============================================================================
 
-function exprToMinimalValueString(expr: Expr, parentOp: string | null = null, isRight = false): string {
-  if (typeof expr === 'number') return String(expr)
-  const [left, op, right] = expr
-  const leftS = exprToMinimalValueString(left, op, false)
-  const rightS = exprToMinimalValueString(right, op, true)
-  let s = `${leftS}${op}${rightS}`
+function expressionToDisplayString(expression: Expression, parentOperator: string | null = null, isRightChild = false): string {
+  if (typeof expression === 'number') return String(expression)
+  const [leftExpr, operator, rightExpr] = expression
+  const leftString = expressionToDisplayString(leftExpr, operator, false)
+  const rightString = expressionToDisplayString(rightExpr, operator, true)
+  let result = `${leftString}${operator}${rightString}`
 
-  let needParen = false
-  if (parentOp !== null) {
-    if (OP_PRECEDENCE[op] < OP_PRECEDENCE[parentOp]) needParen = true
-    if (isRight && (op === '-' || op === '/') && OP_PRECEDENCE[op] === OP_PRECEDENCE[parentOp]) needParen = true
+  let needsParentheses = false
+  if (parentOperator !== null) {
+    if (OPERATOR_PRECEDENCE[operator] < OPERATOR_PRECEDENCE[parentOperator]) needsParentheses = true
+    if (isRightChild && (operator === '-' || operator === '/') && OPERATOR_PRECEDENCE[operator] === OPERATOR_PRECEDENCE[parentOperator]) needsParentheses = true
   }
-  if (needParen) s = `(${s})`
-  return s
+  if (needsParentheses) result = `(${result})`
+  return result
 }
 
-function exprToMinimalPlaceholderString(expr: Expr, startIndex = 0, parentOp: string | null = null, isRight = false): [string, number] {
-  if (typeof expr === 'number') return [`{${startIndex}}`, startIndex + 1]
-  const [left, op, right] = expr
-  const [leftS, nextIdx1] = exprToMinimalPlaceholderString(left, startIndex, op, false)
-  const [rightS, nextIdx2] = exprToMinimalPlaceholderString(right, nextIdx1, op, true)
-  let s = `${leftS}${op}${rightS}`
+function expressionToPlaceholderString(expression: Expression, nextSlotIndex = 0, parentOperator: string | null = null, isRightChild = false): [string, number] {
+  if (typeof expression === 'number') return [`{${nextSlotIndex}}`, nextSlotIndex + 1]
+  const [leftExpr, operator, rightExpr] = expression
+  const [leftString, indexAfterLeft] = expressionToPlaceholderString(leftExpr, nextSlotIndex, operator, false)
+  const [rightString, indexAfterRight] = expressionToPlaceholderString(rightExpr, indexAfterLeft, operator, true)
+  let result = `${leftString}${operator}${rightString}`
 
-  let needParen = false
-  if (parentOp !== null) {
-    if (OP_PRECEDENCE[op] < OP_PRECEDENCE[parentOp]) needParen = true
-    if (isRight && (op === '-' || op === '/') && OP_PRECEDENCE[op] === OP_PRECEDENCE[parentOp]) needParen = true
+  let needsParentheses = false
+  if (parentOperator !== null) {
+    if (OPERATOR_PRECEDENCE[operator] < OPERATOR_PRECEDENCE[parentOperator]) needsParentheses = true
+    if (isRightChild && (operator === '-' || operator === '/') && OPERATOR_PRECEDENCE[operator] === OPERATOR_PRECEDENCE[parentOperator]) needsParentheses = true
   }
-  if (needParen) s = `(${s})`
-  return [s, nextIdx2]
+  if (needsParentheses) result = `(${result})`
+  return [result, indexAfterRight]
 }
 
-function tokenizeTemplate(s: string): string[] {
-  return s.match(/\{[0-9]+\}|\(|\)|[+\-*/]/g) || []
+function tokenizeTemplateString(templateString: string): string[] {
+  return templateString.match(/\{[0-9]+\}|\(|\)|[+\-*/]/g) || []
 }
 
 // ============================================================================
 // TEMPLATE VERIFICATION
 // ============================================================================
 
-function getPermutations<T>(arr: T[], size: number): T[][] {
+function generatePermutations<T>(items: T[], selectionSize: number): T[][] {
   const results: T[][] = []
-  if (size > arr.length) return results
+  if (selectionSize > items.length) return results
 
-  function helper(chosen: T[], remaining: T[]): void {
-    if (chosen.length === size) { results.push([...chosen]); return }
+  function backtrack(chosen: T[], remaining: T[]): void {
+    if (chosen.length === selectionSize) { results.push([...chosen]); return }
     for (let i = 0; i < remaining.length; i++) {
       chosen.push(remaining[i])
-      helper(chosen, [...remaining.slice(0, i), ...remaining.slice(i + 1)])
+      backtrack(chosen, [...remaining.slice(0, i), ...remaining.slice(i + 1)])
       chosen.pop()
     }
   }
-  helper([], arr)
+  backtrack([], items)
   return results
 }
 
-function verifyTemplateSolvable(templateTokens: string[], numbers: number[], target: number): boolean {
-  const numSlots = templateTokens.filter(t => t.startsWith('{')).length
-  const perms = getPermutations(numbers, numSlots)
+function isTemplateSolvable(templateTokens: string[], availableNumbers: number[], target: number): boolean {
+  const slotCount = templateTokens.filter(token => token.startsWith('{')).length
+  const allPermutations = generatePermutations(availableNumbers, slotCount)
 
-  for (const perm of perms) {
-    let exprStr = ''
-    let slotIdx = 0
+  for (const permutation of allPermutations) {
+    let expressionString = ''
+    let slotIndex = 0
     for (const token of templateTokens) {
       if (token.startsWith('{')) {
-        exprStr += String(perm[slotIdx])
-        slotIdx++
+        expressionString += String(permutation[slotIndex])
+        slotIndex++
       } else {
-        exprStr += token
+        expressionString += token
       }
     }
     try {
-      const result = safeEvalToFraction(exprStr)
-      if (result[0] === target && result[1] === 1) return true
+      const evaluatedResult = parseAndEvaluateExpression(expressionString)
+      if (evaluatedResult[0] === target && evaluatedResult[1] === 1) return true
     } catch {
       continue
     }
@@ -242,68 +242,68 @@ function verifyTemplateSolvable(templateTokens: string[], numbers: number[], tar
 }
 
 // ============================================================================
-// SAFE EXPRESSION EVALUATOR
+// SAFE EXPRESSION EVALUATOR (recursive descent parser)
 // ============================================================================
 
-function safeEvalToFraction(exprStr: string): Fraction {
-  if (!/^[0-9+\-*/() ]+$/.test(exprStr)) {
+function parseAndEvaluateExpression(expressionString: string): Fraction {
+  if (!/^[0-9+\-*/() ]+$/.test(expressionString)) {
     throw new Error('Expression contains invalid characters')
   }
 
-  const tokens = exprStr.match(/\d+|[+\-*/()]/g)
+  const tokens = expressionString.match(/\d+|[+\-*/()]/g)
   if (!tokens) throw new Error('Empty expression')
 
-  let pos = 0
+  let position = 0
 
-  function peek(): string | undefined { return tokens![pos] }
-  function consume(): string { return tokens![pos++] }
+  function peekToken(): string | undefined { return tokens![position] }
+  function consumeToken(): string { return tokens![position++] }
 
-  function parseExpr(): Fraction {
-    let left = parseTerm()
-    while (pos < tokens!.length && (peek() === '+' || peek() === '-')) {
-      const op = consume()
-      const right = parseTerm()
-      if (op === '+') left = addFractions(left, right)
-      else left = subtractFractions(left, right)
+  function parseAdditionSubtraction(): Fraction {
+    let leftValue = parseMultiplicationDivision()
+    while (position < tokens!.length && (peekToken() === '+' || peekToken() === '-')) {
+      const operator = consumeToken()
+      const rightValue = parseMultiplicationDivision()
+      if (operator === '+') leftValue = addFractions(leftValue, rightValue)
+      else leftValue = subtractFractions(leftValue, rightValue)
     }
-    return left
+    return leftValue
   }
 
-  function parseTerm(): Fraction {
-    let left = parseFactor()
-    while (pos < tokens!.length && (peek() === '*' || peek() === '/')) {
-      const op = consume()
-      const right = parseFactor()
-      if (op === '*') left = multiplyFractions(left, right)
-      else left = divideFractions(left, right)
+  function parseMultiplicationDivision(): Fraction {
+    let leftValue = parseAtom()
+    while (position < tokens!.length && (peekToken() === '*' || peekToken() === '/')) {
+      const operator = consumeToken()
+      const rightValue = parseAtom()
+      if (operator === '*') leftValue = multiplyFractions(leftValue, rightValue)
+      else leftValue = divideFractions(leftValue, rightValue)
     }
-    return left
+    return leftValue
   }
 
-  function parseFactor(): Fraction {
-    if (peek() === '(') {
-      consume()
-      const val = parseExpr()
-      if (peek() !== ')') throw new Error('Mismatched parentheses')
-      consume()
-      return val
+  function parseAtom(): Fraction {
+    if (peekToken() === '(') {
+      consumeToken()
+      const value = parseAdditionSubtraction()
+      if (peekToken() !== ')') throw new Error('Mismatched parentheses')
+      consumeToken()
+      return value
     }
-    if (peek() === '-') {
-      consume()
-      const val = parseFactor()
-      return multiplyFractions([-1, 1], val)
+    if (peekToken() === '-') {
+      consumeToken()
+      const value = parseAtom()
+      return multiplyFractions([-1, 1], value)
     }
-    if (peek() === '+') {
-      consume()
-      return parseFactor()
+    if (peekToken() === '+') {
+      consumeToken()
+      return parseAtom()
     }
-    const numStr = consume()
-    if (!/^\d+$/.test(numStr)) throw new Error(`Unexpected token: ${numStr}`)
-    return [parseInt(numStr, 10), 1]
+    const numberString = consumeToken()
+    if (!/^\d+$/.test(numberString)) throw new Error(`Unexpected token: ${numberString}`)
+    return [parseInt(numberString, 10), 1]
   }
 
-  const result = parseExpr()
-  if (pos < tokens.length) throw new Error('Unexpected trailing tokens')
+  const result = parseAdditionSubtraction()
+  if (position < tokens.length) throw new Error('Unexpected trailing tokens')
   return result
 }
 
@@ -320,47 +320,47 @@ export function puzzleNew({
 } = {}): PuzzleOut {
   if (numOperands < 2) throw new Error('num_operands must be >= 2')
 
-  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
-    const expr = makeRandomExpr(numOperands)
+  for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS; attempt++) {
+    const expression = buildRandomExpression(numOperands)
 
-    let result: Fraction
-    try { result = evalExprFraction(expr) } catch { continue }
-    if (result[1] !== 1) continue
+    let evaluatedFraction: Fraction
+    try { evaluatedFraction = evaluateExpressionAsFraction(expression) } catch { continue }
+    if (evaluatedFraction[1] !== 1) continue
 
-    const val = result[0]
-    if (val < targetMin || val > targetMax) continue
+    const targetValue = evaluatedFraction[0]
+    if (targetValue < targetMin || targetValue > targetMax) continue
 
-    const used = collectLeaves(expr)
-    if (used.length !== numOperands || new Set(used).size !== numOperands) continue
+    const usedNumbers = collectLeafValues(expression)
+    if (usedNumbers.length !== numOperands || new Set(usedNumbers).size !== numOperands) continue
 
-    const numbers = [...used]
+    const numberBank = [...usedNumbers]
     const decoyPool: number[] = []
-    for (let n = MIN_LEAF; n <= MAX_LEAF; n++) {
-      if (!numbers.includes(n)) decoyPool.push(n)
+    for (let n = MIN_LEAF_VALUE; n <= MAX_LEAF_VALUE; n++) {
+      if (!numberBank.includes(n)) decoyPool.push(n)
     }
     if (decoyPool.length < decoys) continue
 
-    const shuffledDecoys = shuffle(decoyPool)
-    numbers.push(...shuffledDecoys.slice(0, decoys))
-    const shuffledNumbers = shuffle(numbers)
+    const shuffledDecoys = shuffleArray(decoyPool)
+    numberBank.push(...shuffledDecoys.slice(0, decoys))
+    const shuffledBank = shuffleArray(numberBank)
 
-    const [placeholderStr, placeholderCount] = exprToMinimalPlaceholderString(expr, 0)
-    const tokens = tokenizeTemplate(placeholderStr)
+    const [placeholderString, placeholderCount] = expressionToPlaceholderString(expression, 0)
+    const templateTokens = tokenizeTemplateString(placeholderString)
     if (placeholderCount !== numOperands) continue
 
     if (Math.random() < requireParensProb) {
-      if (!tokens.includes('(')) continue
+      if (!templateTokens.includes('(')) continue
     }
 
-    if (!verifyTemplateSolvable(tokens, shuffledNumbers, val)) continue
+    if (!isTemplateSolvable(templateTokens, shuffledBank, targetValue)) continue
 
     return {
-      target: val,
-      numbers: shuffledNumbers,
-      solution_expr: exprToMinimalValueString(expr),
-      used_numbers: used,
+      target: targetValue,
+      numbers: shuffledBank,
+      solution_expr: expressionToDisplayString(expression),
+      used_numbers: usedNumbers,
       max_operand_count: numOperands,
-      template_tokens: tokens,
+      template_tokens: templateTokens,
       num_placeholders: placeholderCount,
     }
   }
@@ -374,56 +374,55 @@ export function puzzleNew({
 
 export function puzzleRush({ difficulty = 1, decoys = 2 } = {}): PuzzleOut {
   if (difficulty < 1 || difficulty > 12) throw new Error('difficulty must be 1-12')
-
+  console.log("difficulty", difficulty)
   const config = DIFFICULTY_CONFIGS[difficulty]
 
-  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
-    const expr = makeRandomExprConstrained(5, config.ops, config.min_leaf, config.max_leaf)
+  for (let attempt = 0; attempt < MAX_GENERATION_ATTEMPTS; attempt++) {
+    const expression = buildRandomExpressionConstrained(5, config.ops, config.min_leaf, config.max_leaf)
 
-    let result: Fraction
-    try { result = evalExprFraction(expr) } catch { continue }
-    if (result[1] !== 1) continue
+    let evaluatedFraction: Fraction
+    try { evaluatedFraction = evaluateExpressionAsFraction(expression) } catch { continue }
+    if (evaluatedFraction[1] !== 1) continue
 
-    const val = result[0]
-    if (val < config.target_min || val > config.target_max) continue
+    const targetValue = evaluatedFraction[0]
+    if (targetValue < config.target_min || targetValue > config.target_max) continue
 
-    const used = collectLeaves(expr)
-    if (used.length !== 5 || new Set(used).size !== 5) continue
+    const usedNumbers = collectLeafValues(expression)
+    if (usedNumbers.length !== 5 || new Set(usedNumbers).size !== 5) continue
 
-    const numbers = [...used]
+    const numberBank = [...usedNumbers]
     const decoyPool: number[] = []
     for (let n = config.min_leaf; n <= config.max_leaf; n++) {
-      if (!numbers.includes(n)) decoyPool.push(n)
+      if (!numberBank.includes(n)) decoyPool.push(n)
     }
     if (decoyPool.length < decoys) continue
 
-    const shuffledDecoys = shuffle(decoyPool)
-    numbers.push(...shuffledDecoys.slice(0, decoys))
-    const shuffledNumbers = shuffle(numbers)
+    const shuffledDecoys = shuffleArray(decoyPool)
+    numberBank.push(...shuffledDecoys.slice(0, decoys))
+    const shuffledBank = shuffleArray(numberBank)
 
-    const [placeholderStr, placeholderCount] = exprToMinimalPlaceholderString(expr, 0)
-    const tokens = tokenizeTemplate(placeholderStr)
+    const [placeholderString, placeholderCount] = expressionToPlaceholderString(expression, 0)
+    const templateTokens = tokenizeTemplateString(placeholderString)
     if (placeholderCount !== 5) continue
 
-    const maxMuls = config.max_muls
-    const maxDivs = config.max_divs
-    const minDivs = config.min_divs || 0
-    if (maxMuls !== null && countOperator(expr, '*') > maxMuls) continue
-    if (maxDivs !== null && countOperator(expr, '/') > maxDivs) continue
-    if (countOperator(expr, '/') < minDivs) continue
+    const multiplicationCount = countOperatorOccurrences(expression, '*')
+    const divisionCount = countOperatorOccurrences(expression, '/')
+    if (config.max_muls !== null && multiplicationCount > config.max_muls) continue
+    if (config.max_divs !== null && divisionCount > config.max_divs) continue
+    if (divisionCount < (config.min_divs || 0)) continue
 
-    const parenCount = tokens.filter(t => t === '(').length
-    if (parenCount < config.min_parens || parenCount > config.max_parens) continue
+    const parenthesisCount = templateTokens.filter(t => t === '(').length
+    if (parenthesisCount < config.min_parens || parenthesisCount > config.max_parens) continue
 
-    if (!verifyTemplateSolvable(tokens, shuffledNumbers, val)) continue
+    if (!isTemplateSolvable(templateTokens, shuffledBank, targetValue)) continue
 
     return {
-      target: val,
-      numbers: shuffledNumbers,
+      target: targetValue,
+      numbers: shuffledBank,
       solution_expr: null,
-      used_numbers: used,
+      used_numbers: usedNumbers,
       max_operand_count: 5,
-      template_tokens: tokens,
+      template_tokens: templateTokens,
       num_placeholders: placeholderCount,
     }
   }
@@ -438,59 +437,59 @@ export function puzzleRush({ difficulty = 1, decoys = 2 } = {}): PuzzleOut {
 export function puzzleCheck({ numbers, expression, target }: { numbers: number[]; expression: string; target?: number }): CheckResult {
   if (!numbers || !expression) throw new Error('Missing numbers or expression')
 
-  const usedNumbers = (expression.match(/\d+/g) || []).map(Number)
+  const numbersUsedInExpression = (expression.match(/\d+/g) || []).map(Number)
 
-  const bankCounts: Record<number, number> = {}
-  for (const n of numbers) bankCounts[n] = (bankCounts[n] || 0) + 1
+  const availableCounts: Record<number, number> = {}
+  for (const n of numbers) availableCounts[n] = (availableCounts[n] || 0) + 1
 
-  const tempCounts = { ...bankCounts }
-  for (const u of usedNumbers) {
-    if ((tempCounts[u] || 0) <= 0) {
+  const remainingCounts = { ...availableCounts }
+  for (const usedNumber of numbersUsedInExpression) {
+    if ((remainingCounts[usedNumber] || 0) <= 0) {
       return {
         correct: false,
         reason: 'invalid_expression',
         evaluated: null,
         evaluated_display: null,
-        message: `Number ${u} not available or used too many times`,
+        message: `Number ${usedNumber} not available or used too many times`,
       }
     }
-    tempCounts[u]--
+    remainingCounts[usedNumber]--
   }
 
-  let valFrac: Fraction
+  let evaluatedFraction: Fraction
   try {
-    valFrac = safeEvalToFraction(expression)
+    evaluatedFraction = parseAndEvaluateExpression(expression)
   } catch (e: any) {
-    const msg = e.message?.includes('Division by zero') ? 'Division by zero' : `Invalid expression: ${e.message}`
+    const errorMessage = e.message?.includes('Division by zero') ? 'Division by zero' : `Invalid expression: ${e.message}`
     return {
       correct: false,
       reason: 'invalid_expression',
       evaluated: null,
       evaluated_display: null,
-      message: msg,
+      message: errorMessage,
     }
   }
 
-  const evaluated = valFrac[1] === 1 ? valFrac[0] : valFrac[0] / valFrac[1]
-  const evaluatedDisplay = valFrac[1] === 1 ? String(valFrac[0]) : `${valFrac[0]}/${valFrac[1]}`
+  const evaluatedValue = evaluatedFraction[1] === 1 ? evaluatedFraction[0] : evaluatedFraction[0] / evaluatedFraction[1]
+  const evaluatedDisplayString = evaluatedFraction[1] === 1 ? String(evaluatedFraction[0]) : `${evaluatedFraction[0]}/${evaluatedFraction[1]}`
 
   if (target !== undefined && target !== null) {
-    const targetVal = Number(target)
-    if (isNaN(targetVal)) {
+    const targetValue = Number(target)
+    if (isNaN(targetValue)) {
       return {
         correct: false,
         reason: 'invalid_expression',
-        evaluated,
-        evaluated_display: evaluatedDisplay,
+        evaluated: evaluatedValue,
+        evaluated_display: evaluatedDisplayString,
         message: 'Invalid target value',
       }
     }
-    const correct = valFrac[0] === targetVal && valFrac[1] === 1
+    const isCorrect = evaluatedFraction[0] === targetValue && evaluatedFraction[1] === 1
     return {
-      correct,
-      reason: correct ? 'correct' : 'wrong_value',
-      evaluated,
-      evaluated_display: evaluatedDisplay,
+      correct: isCorrect,
+      reason: isCorrect ? 'correct' : 'wrong_value',
+      evaluated: evaluatedValue,
+      evaluated_display: evaluatedDisplayString,
       message: null,
     }
   }
@@ -498,8 +497,8 @@ export function puzzleCheck({ numbers, expression, target }: { numbers: number[]
   return {
     correct: false,
     reason: 'valid_expression',
-    evaluated,
-    evaluated_display: evaluatedDisplay,
+    evaluated: evaluatedValue,
+    evaluated_display: evaluatedDisplayString,
     message: null,
   }
 }
